@@ -2,7 +2,7 @@ import { sha256 } from '../core/ids.js'
 import { send } from '../core/send.js'
 import { recordEvent } from '../core/events.js'
 import { consume, findUnconsumedByHash } from '../core/consumption.js'
-import { listBox, movePacket, readPacket, writePacket } from '../mailbox/mailbox.js'
+import { discardStaged, listBox, movePacket, publishStaged, readPacket, stagePacket } from '../mailbox/mailbox.js'
 import type { AgentAdapter, DispatchResult, Packet, PollResult } from './types.js'
 
 export interface BaseAdapterOptions {
@@ -35,19 +35,33 @@ export abstract class BaseAdapter implements AgentAdapter {
     if (packet.recipient !== this.id) {
       throw new Error(`adapter ${this.id} cannot dispatch to ${packet.recipient}`)
     }
-    // Publish payload to disk first (atomic), then register the authoritative row.
-    const written = writePacket(packet.recipient, packet.body, { root: this.mailRoot })
-    const { message, deduped } = await send({
-      sender: packet.sender,
-      recipient: packet.recipient,
-      thread: packet.thread,
-      type: packet.type,
-      summary: packet.summary,
-      body: packet.body,
-      bodyPath: written.path,
-      origin: packet.origin,
-    })
-    return { message, path: written.path, deduped }
+    // FDQ-B8: stage the payload (invisible in unread/), commit the authoritative row with its final
+    // body_path, THEN atomically publish. A poll landing in the window sees nothing to quarantine,
+    // because the packet is only visible in unread/ once its row already exists.
+    const staged = stagePacket(packet.recipient, packet.body, { root: this.mailRoot })
+    try {
+      const { message, deduped } = await send({
+        sender: packet.sender,
+        recipient: packet.recipient,
+        thread: packet.thread,
+        type: packet.type,
+        summary: packet.summary,
+        body: packet.body,
+        bodyPath: staged.finalPath,
+        origin: packet.origin,
+      })
+      if (deduped) {
+        // Identical packet already registered + published on a prior dispatch — re-publishing would
+        // create an orphan file. Drop the stage; return the existing row's path.
+        discardStaged(staged)
+        return { message, path: message.body_path ?? staged.finalPath, deduped }
+      }
+      const path = publishStaged(staged)
+      return { message, path, deduped }
+    } catch (err) {
+      discardStaged(staged)
+      throw err
+    }
   }
 
   async pollStatus(): Promise<PollResult> {

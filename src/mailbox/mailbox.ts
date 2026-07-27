@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 // Disk mailbox: .bion/mail/<recipient>/{unread,read,flagged}/ — append-only markdown packets.
@@ -27,20 +27,53 @@ export interface WrittenPacket {
   filename: string
 }
 
-/** Atomically write a packet into the recipient's unread/ box. Returns its final path. */
-export function writePacket(
+export interface StagedPacket {
+  /** Written, not yet visible in unread/. */
+  tmpPath: string
+  /** Where publishStaged() will atomically place it. */
+  finalPath: string
+  filename: string
+}
+
+/**
+ * Stage a packet to .tmp/ WITHOUT publishing it. The payload exists on disk but is invisible to
+ * readers scanning unread/. Callers publish it (publishStaged) only AFTER the authoritative DB row
+ * is committed — so a packet is never observable in unread/ before its row exists (FDQ-B8).
+ */
+export function stagePacket(
   recipient: string,
   content: string,
   opts: { root?: string; filename?: string } = {},
-): WrittenPacket {
+): StagedPacket {
   const root = opts.root ?? ''
   ensureDirs(root, recipient)
   const filename = opts.filename ?? `${randomUUID()}.md`
   const tmpPath = join(mailboxRoot(root), recipient, '.tmp', `${randomUUID()}.tmp`)
   const finalPath = join(boxDir(root, recipient, 'unread'), filename)
   writeFileSync(tmpPath, content, 'utf8')
-  renameSync(tmpPath, finalPath) // atomic publish
-  return { path: finalPath, filename }
+  return { tmpPath, finalPath, filename }
+}
+
+/** Atomically publish a staged packet into unread/ (the visible point). Returns its final path. */
+export function publishStaged(staged: StagedPacket): string {
+  renameSync(staged.tmpPath, staged.finalPath)
+  return staged.finalPath
+}
+
+/** Drop a staged packet without publishing (e.g. the row was a dedup no-op, or send() failed). */
+export function discardStaged(staged: StagedPacket): void {
+  if (existsSync(staged.tmpPath)) rmSync(staged.tmpPath)
+}
+
+/** Atomically write a packet straight into unread/ (stage + publish). Returns its final path. */
+export function writePacket(
+  recipient: string,
+  content: string,
+  opts: { root?: string; filename?: string } = {},
+): WrittenPacket {
+  const staged = stagePacket(recipient, content, opts)
+  const path = publishStaged(staged)
+  return { path, filename: staged.filename }
 }
 
 export function listBox(recipient: string, box: Box, root?: string): string[] {
