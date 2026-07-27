@@ -24,7 +24,7 @@ export interface OutboxRow {
   id: string
   kind: OutboxKind
   payload: PublishPayload | NotifyPayload
-  status: 'pending' | 'done'
+  status: 'pending' | 'sending' | 'done'
   dedup_key: string
   attempts: number
 }
