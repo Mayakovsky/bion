@@ -48,7 +48,8 @@ function reviewPacket(task: Task): string {
  * Stage a completion durably (Phase D1): in ONE transaction, record the completion event, flip the
  * task to done, and enqueue BOTH outward intents — the ntfy to Forces AND the Desktop review packet
  * (as a routed messages row + a publish-outbox entry). Nothing is sent here; the drainer/reconciler
- * performs the side effects exactly once. A crash after this commit loses nothing (closes FDQ-B7).
+ * performs the side effects durably: the review packet exactly-once, the notification at-least-once
+ * (dup-tolerant). A crash after this commit loses nothing (closes FDQ-B7).
  */
 export async function stageCompletion(
   taskId: string,
@@ -101,7 +102,7 @@ export async function stageCompletion(
  * State monitor — handle a task-completion signal. Stage the intents transactionally, then drain.
  * A duplicate signal is a pure no-op (the completion event dedups on the task id). Because the
  * outward actions are durable intents, a crash between commit and drain is recovered by the
- * reconciler — the notification and review are performed exactly once (Gate D1).
+ * reconciler — the review is published exactly-once and the notification sent at-least-once (Gate D1).
  */
 export async function reportCompletion(
   taskId: string,

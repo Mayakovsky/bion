@@ -1,13 +1,15 @@
 import { existsSync } from 'node:fs'
-import { pool, query, type Executor } from './pool.js'
+import { pool, query, withTransaction, type Executor } from './pool.js'
 import { isConsumed } from '../core/consumption.js'
 import { publishBodyToPath } from '../mailbox/mailbox.js'
 import { notifyForces, type NotifyFn, type NotifyInput, type NotifyResult } from '../notify/ntfy.js'
 
 // Transactional outbox (Phase D1). Callers write a state row AND an outbox entry in ONE
-// transaction (enqueueOutbox on the tx client); a drainer/reconciler performs the side effect
-// and marks the entry done — idempotently. Guarantees every committed intent is eventually
-// performed exactly once, surviving a crash at any point.
+// transaction (enqueueOutbox on the tx client); a drainer/reconciler performs the side effect and
+// marks the entry done. Every committed intent survives a crash at any point, with these guarantees:
+//   - publish : EXACTLY-ONCE  (idempotent place + status-independent repairPublishes)
+//   - notify  : AT-LEAST-ONCE (claim→'sending', send, then 'done'; a crash mid-send re-sends on
+//               reconcile — a duplicate ntfy to a human is harmless, a lost one is not; directive-04)
 
 export type OutboxKind = 'publish' | 'notify'
 
@@ -51,14 +53,28 @@ export interface DrainResult {
   notifications: { dedupKey: string; result: NotifyResult }[]
 }
 
-/** Atomically claim a pending entry (pending → done). Returns true if this caller won the claim. */
-async function claim(id: string, exec: Executor = pool()): Promise<boolean> {
+/** Claim a pending publish entry straight to 'done' (publish is idempotent + repair-covered). */
+async function claimDone(id: string, exec: Executor = pool()): Promise<boolean> {
   const res = await exec.query(
     `UPDATE outbox SET status = 'done', attempts = attempts + 1, done_at = now()
      WHERE id = $1 AND status = 'pending' RETURNING id`,
     [id],
   )
   return (res.rowCount ?? 0) > 0
+}
+
+/** Claim a pending notify entry to the pre-send 'sending' state (marked 'done' only after send). */
+async function claimSending(id: string, exec: Executor = pool()): Promise<boolean> {
+  const res = await exec.query(
+    `UPDATE outbox SET status = 'sending', attempts = attempts + 1, done_at = NULL
+     WHERE id = $1 AND status = 'pending' RETURNING id`,
+    [id],
+  )
+  return (res.rowCount ?? 0) > 0
+}
+
+async function markDone(id: string, exec: Executor = pool()): Promise<void> {
+  await exec.query(`UPDATE outbox SET status = 'done', done_at = now() WHERE id = $1`, [id])
 }
 
 /** Revert a claimed entry so it is retried on the next drain (side effect failed). */
@@ -75,9 +91,9 @@ async function ensurePublished(payload: PublishPayload): Promise<'published' | '
 }
 
 /**
- * Drain pending entries. Each entry is claimed (so a concurrent drainer / re-run cannot double-act),
- * then its side effect is performed; a failure reverts the claim for retry. publish is idempotent
- * (existsSync/consumed guard); notify is claim-then-send so a re-drain never double-notifies.
+ * Drain pending entries. publish is claimed straight to 'done' then materialized (idempotent). notify
+ * is claimed to 'sending', SENT, then marked 'done' — so a crash between the send and the mark leaves
+ * the row 'sending' for the reconciler to re-send (at-least-once). A failure reverts to 'pending'.
  */
 export async function drainOutbox(deps: DrainDeps = {}): Promise<DrainResult> {
   const notify = deps.notify ?? ((i: NotifyInput) => notifyForces(i))
@@ -87,19 +103,44 @@ export async function drainOutbox(deps: DrainDeps = {}): Promise<DrainResult> {
   const out: DrainResult = { published: 0, notifications: [] }
 
   for (const e of pending.rows) {
-    if (!(await claim(e.id))) continue // someone else took it
-    try {
-      if (e.kind === 'publish') {
+    if (e.kind === 'publish') {
+      if (!(await claimDone(e.id))) continue
+      try {
         await ensurePublished(e.payload as PublishPayload)
         out.published++
-      } else {
-        const result = await notify(e.payload as NotifyPayload)
-        out.notifications.push({ dedupKey: e.dedup_key, result })
+      } catch (err) {
+        await markPending(e.id)
+        throw err
       }
-    } catch (err) {
-      await markPending(e.id) // roll the claim back; retry next drain
-      throw err
+    } else {
+      if (!(await claimSending(e.id))) continue
+      try {
+        const result = await notify(e.payload as NotifyPayload)
+        await markDone(e.id) // mark done ONLY after the send completes
+        out.notifications.push({ dedupKey: e.dedup_key, result })
+      } catch (err) {
+        await markPending(e.id) // send failed → retry next drain
+        throw err
+      }
     }
+  }
+  return out
+}
+
+/**
+ * Recover notify entries stuck in 'sending' (a crash occurred between claim and mark-done). Re-send
+ * and mark done. This is the notify half of at-least-once; a duplicate send here is acceptable.
+ */
+async function recoverSendingNotifies(deps: DrainDeps = {}): Promise<DrainResult['notifications']> {
+  const notify = deps.notify ?? ((i: NotifyInput) => notifyForces(i))
+  const stuck = await query<OutboxRow>(
+    `SELECT id, kind, payload, status, dedup_key, attempts FROM outbox WHERE kind = 'notify' AND status = 'sending' ORDER BY created`,
+  )
+  const out: DrainResult['notifications'] = []
+  for (const e of stuck.rows) {
+    const result = await notify(e.payload as NotifyPayload)
+    await markDone(e.id)
+    out.push({ dedupKey: e.dedup_key, result })
   }
   return out
 }
@@ -122,9 +163,28 @@ export async function repairPublishes(): Promise<number> {
   return repaired
 }
 
-/** Startup + periodic reconciliation: repair missing publishes, then drain pending intents. */
+/**
+ * Startup + periodic reconciliation: repair missing publishes, re-send notify entries orphaned in
+ * 'sending' (at-least-once), then drain pending intents.
+ */
 export async function reconcile(deps: DrainDeps = {}): Promise<DrainResult & { repaired: number }> {
   const repaired = await repairPublishes()
+  const recovered = await recoverSendingNotifies(deps)
   const drained = await drainOutbox(deps)
-  return { ...drained, repaired }
+  return { published: drained.published, notifications: [...recovered, ...drained.notifications], repaired }
+}
+
+/**
+ * Durably send a notification: persist a notify-intent to the outbox (idempotent on dedupKey), then
+ * drain. If the process dies before the send, the reconciler re-sends it (at-least-once). Used to
+ * give reactive/watcher notifications the same durability as completion notifications (FDQ-B10).
+ */
+export async function notifyDurably(
+  payload: NotifyPayload,
+  dedupKey: string,
+  deps: DrainDeps = {},
+): Promise<NotifyResult | undefined> {
+  await withTransaction((client) => enqueueOutbox({ kind: 'notify', payload, dedupKey }, client))
+  const drain = await drainOutbox({ notify: deps.notify })
+  return drain.notifications.find((n) => n.dedupKey === dedupKey)?.result
 }

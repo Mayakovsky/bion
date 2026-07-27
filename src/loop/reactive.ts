@@ -3,9 +3,9 @@ import { query } from '../db/pool.js'
 import { recordEvent } from '../core/events.js'
 import { createTask, getTask } from '../core/tasks.js'
 import { routePacket } from '../core/routing.js'
-import { drainOutbox } from '../db/outbox.js'
+import { notifyDurably } from '../db/outbox.js'
 import { mailboxRoot } from '../mailbox/mailbox.js'
-import { notifyForces, type NotifyFn, type NotifyResult } from '../notify/ntfy.js'
+import type { NotifyFn, NotifyResult } from '../notify/ntfy.js'
 import type { AgentAdapter } from '../adapters/types.js'
 import type { Task } from '../core/types.js'
 import type { TestSignal } from '../watchers/types.js'
@@ -113,7 +113,7 @@ function autofixTaskId(signal: TestSignal): string {
 }
 
 /** Default live behavior: create an unratified task, queue a Desktop review, notify Forces. No dispatch. */
-async function surface(signal: TestSignal, deps: ReactiveDeps): Promise<{ taskId: string; reviewPath: string; notified: NotifyResult }> {
+async function surface(signal: TestSignal, deps: ReactiveDeps): Promise<{ taskId: string; reviewPath: string; notified?: NotifyResult }> {
   const taskId = autofixTaskId(signal)
   if (!(await getTask(taskId))) {
     await createTask({
@@ -132,22 +132,23 @@ async function surface(signal: TestSignal, deps: ReactiveDeps): Promise<{ taskId
     '',
   ].join('\n')
   const routed = await routePacket({ sender: 'bion', recipient: 'desktop', thread: taskId, type: 'review-request', summary: `review ${taskId}`, body: reviewBody, origin: 'bion:watcher', mailRoot: deps.mailRoot })
-  await drainOutbox({ notify: deps.notify })
-
-  const notify = deps.notify ?? ((i) => notifyForces(i))
-  const notified = await notify({
-    title: `Bion: test failure on ${signal.branch}`,
-    message: `Auto-created unratified task ${taskId} from failing tests (${signal.failedTests.join(', ') || 'unnamed'}). Review + ratify to proceed.`,
-    priority: 4,
-    tags: ['bion', 'watcher', 'test'],
-  })
+  // notifyDurably drains — it both publishes the routed review and sends the notification durably.
+  const notified = await notifyDurably(
+    {
+      title: `Bion: test failure on ${signal.branch}`,
+      message: `Auto-created unratified task ${taskId} from failing tests (${signal.failedTests.join(', ') || 'unnamed'}). Review + ratify to proceed.`,
+      priority: 4,
+      tags: ['bion', 'watcher', 'test'],
+    },
+    `notify:watcher:${signal.branch}:${signal.runId}`,
+    deps,
+  )
   return { taskId, reviewPath: routed.finalPath, notified }
 }
 
 /** React to a test-FAILURE signal per the active mode. (Passes are handled by the caller.) */
 export async function onTestFailure(signal: TestSignal, deps: ReactiveDeps): Promise<ReactiveOutcome> {
   const mode = deps.mode ?? reactiveMode()
-  const notify = deps.notify ?? ((i) => notifyForces(i))
 
   if (mode === 'on') {
     const d = await decide(signal, deps)
@@ -168,12 +169,16 @@ export async function onTestFailure(signal: TestSignal, deps: ReactiveDeps): Pro
         '',
       ].join('\n')
       await deps.kov.dispatch({ sender: 'bion', recipient: 'kov', thread: d.task.id, type: 'autofix', summary: `autofix ${d.task.id}`, body, origin: 'bion:reactive' })
-      const notified = await notify({
-        title: `Bion: auto-dispatched fix for ${d.task.id}`,
-        message: `Auto-dispatched a fix to Kov for ratified task ${d.task.id} on ${signal.branch} (bounded envelope).`,
-        priority: 4,
-        tags: ['bion', 'reactive', 'dispatch'],
-      })
+      const notified = await notifyDurably(
+        {
+          title: `Bion: auto-dispatched fix for ${d.task.id}`,
+          message: `Auto-dispatched a fix to Kov for ratified task ${d.task.id} on ${signal.branch} (bounded envelope).`,
+          priority: 4,
+          tags: ['bion', 'reactive', 'dispatch'],
+        },
+        `notify:dispatch:${d.task.id}:${signal.runId}`,
+        deps,
+      )
       return { mode, taskId: d.task.id, dispatched: true, notified }
     }
 
@@ -181,7 +186,11 @@ export async function onTestFailure(signal: TestSignal, deps: ReactiveDeps): Pro
     const s = await surface(signal, deps)
     if (d.haltReason === 'loop-halt' || d.haltReason === 'circuit-breaker') {
       await recordEvent({ kind: 'reactive.halt', source: 'reactive', payload: { taskId: d.task?.id, branch: signal.branch, reason: d.haltReason, runId: signal.runId }, dedupKey: `reactive.halt:${signal.branch}:${signal.runId}` })
-      const notified = await notify({ title: `Bion: auto-fix HALTED (${d.haltReason})`, message: `Auto-fix halted for ${d.task?.id ?? signal.branch} on ${signal.branch}: ${d.haltReason}.`, priority: 5, tags: ['bion', 'reactive', 'halt'] })
+      const notified = await notifyDurably(
+        { title: `Bion: auto-fix HALTED (${d.haltReason})`, message: `Auto-fix halted for ${d.task?.id ?? signal.branch} on ${signal.branch}: ${d.haltReason}.`, priority: 5, tags: ['bion', 'reactive', 'halt'] },
+        `notify:halt:${signal.branch}:${signal.runId}`,
+        deps,
+      )
       return { mode, taskId: s.taskId, dispatched: false, halted: d.haltReason, reviewPath: s.reviewPath, notified }
     }
     return { mode, taskId: s.taskId, dispatched: false, halted: d.haltReason, reviewPath: s.reviewPath, notified: s.notified }
@@ -193,7 +202,11 @@ export async function onTestFailure(signal: TestSignal, deps: ReactiveDeps): Pro
     if (d.dispatch && d.task) {
       const wouldDispatch = { taskId: d.task.id, targetBranch: signal.branch, trigger: 'test.failed' }
       await recordEvent({ kind: 'reactive.shadow', source: 'reactive', payload: { ...wouldDispatch, runId: signal.runId }, dedupKey: `reactive.shadow:${d.task.id}:${signal.runId}` })
-      const notified = await notify({ title: `Bion SHADOW: would auto-dispatch ${d.task.id}`, message: `SHADOW: would auto-dispatch a fix for ${d.task.id} on ${signal.branch}. Nothing fired.`, priority: 3, tags: ['bion', 'reactive', 'shadow'] })
+      const notified = await notifyDurably(
+        { title: `Bion SHADOW: would auto-dispatch ${d.task.id}`, message: `SHADOW: would auto-dispatch a fix for ${d.task.id} on ${signal.branch}. Nothing fired.`, priority: 3, tags: ['bion', 'reactive', 'shadow'] },
+        `notify:shadow:${d.task.id}:${signal.runId}`,
+        deps,
+      )
       return { mode, taskId: s.taskId, dispatched: false, wouldDispatch, reviewPath: s.reviewPath, notified }
     }
     return { mode, taskId: s.taskId, dispatched: false, halted: d.haltReason, reviewPath: s.reviewPath, notified: s.notified }
