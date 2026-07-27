@@ -1,0 +1,6 @@
+# pnpm settings. esbuild ships its platform binary via a postinstall build; vitest needs it,
+# so we approve it explicitly (otherwise `pnpm test`'s preflight fails on ignored builds).
+onlyBuiltDependencies:
+  - esbuild
+allowBuilds:
+  esbuild: true

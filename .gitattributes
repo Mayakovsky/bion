@@ -1,0 +1,3 @@
+# Normalize line endings to LF in the repo (cross-platform; shell scripts require LF).
+* text=auto eol=lf
+*.sh text eol=lf

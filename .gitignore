@@ -1,0 +1,22 @@
+# Secrets / local env — never commit
+.env
+.env.local
+*.local
+
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+pnpm-debug.log*
+
+# Local Postgres cluster lives OUTSIDE the repo (~/.bion-pg); never vendored here.
+pgdata/
+*.superpw
+*.rwpw
+*.ownerpw
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
