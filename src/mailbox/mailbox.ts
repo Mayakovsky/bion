@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 
 // Disk mailbox: .bion/mail/<recipient>/{unread,read,flagged}/ — append-only markdown packets.
 // Writes are atomic: staged in .tmp/ then renamed into unread/ (rename is atomic on one volume),
@@ -74,6 +74,23 @@ export function writePacket(
   const staged = stagePacket(recipient, content, opts)
   const path = publishStaged(staged)
   return { path, filename: staged.filename }
+}
+
+/**
+ * Atomically publish `body` to an absolute `finalPath` (…/<recipient>/unread/<file>). Used by the
+ * outbox drainer/reconciler to materialize a packet from its persisted payload — decoupled from
+ * recipient/root because the path already encodes them. Idempotent when guarded by an existsSync
+ * check upstream (the drainer skips if the file is already present or the message is consumed).
+ */
+export function publishBodyToPath(finalPath: string, body: string): string {
+  const unreadDir = dirname(finalPath) // …/<recipient>/unread
+  const tmpDir = join(dirname(unreadDir), '.tmp')
+  mkdirSync(unreadDir, { recursive: true })
+  mkdirSync(tmpDir, { recursive: true })
+  const tmp = join(tmpDir, `${randomUUID()}.tmp`)
+  writeFileSync(tmp, body, 'utf8')
+  renameSync(tmp, finalPath)
+  return finalPath
 }
 
 export function listBox(recipient: string, box: Box, root?: string): string[] {

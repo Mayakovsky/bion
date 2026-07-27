@@ -1,4 +1,4 @@
-import { query } from '../db/pool.js'
+import { pool, query, type Executor } from '../db/pool.js'
 import { assertAcyclic } from './dag.js'
 import type { Task } from './types.js'
 
@@ -50,8 +50,8 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
   return res.rows[0]!
 }
 
-export async function getTask(id: string): Promise<Task | null> {
-  const res = await query<Task>(
+export async function getTask(id: string, exec: Executor = pool()): Promise<Task | null> {
+  const res = await exec.query<Task>(
     `SELECT id, title, description, owner, priority, status, dependencies, ratified, created, updated
      FROM tasks WHERE id = $1`,
     [id],
@@ -59,14 +59,18 @@ export async function getTask(id: string): Promise<Task | null> {
   return res.rows[0] ?? null
 }
 
-/** Idempotent status transition (Phase C uses this from the state monitor). */
-export async function setTaskStatus(id: string, status: Task['status']): Promise<Task | null> {
-  const res = await query<Task>(
+/** Idempotent status transition (the state monitor uses this). */
+export async function setTaskStatus(
+  id: string,
+  status: Task['status'],
+  exec: Executor = pool(),
+): Promise<Task | null> {
+  const res = await exec.query<Task>(
     `UPDATE tasks SET status = $2, updated = now()
      WHERE id = $1 AND status IS DISTINCT FROM $2
      RETURNING id, title, description, owner, priority, status, dependencies, ratified, created, updated`,
     [id, status],
   )
   if ((res.rowCount ?? 0) > 0) return res.rows[0]!
-  return getTask(id)
+  return getTask(id, exec)
 }

@@ -3,6 +3,18 @@ import { env } from '../env.js'
 
 const { Pool } = pg
 
+/**
+ * Anything that can run a query — the Pool or a checked-out client mid-transaction. Core
+ * functions accept an optional Executor so a caller can run them inside one transaction
+ * (e.g. write a state row + its outbox entry atomically); default is the pool (autocommit).
+ */
+export interface Executor {
+  query<R extends pg.QueryResultRow = pg.QueryResultRow>(
+    text: string,
+    params?: unknown[],
+  ): Promise<pg.QueryResult<R>>
+}
+
 // Lazily-constructed runtime pool (bion_rw). closePool() nulls the ref so a later
 // call transparently reopens — this lets test files each close cleanly without
 // starving the next file (see test/setup.ts).

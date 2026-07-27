@@ -42,6 +42,7 @@ export interface AgentAdapter {
   readonly id: string
   readonly capabilities: string[]
   readonly wakeMode: 'auto' | 'user_initiated'
+  readonly mailRoot: string
   /** Bion routes a packet TO this agent: publish to its mailbox + register in state. */
   dispatch(packet: Packet): Promise<DispatchResult>
   /** This agent reads its inbox; only DB-corroborated packets are returned (routing authority). */

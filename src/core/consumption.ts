@@ -1,4 +1,4 @@
-import { query } from '../db/pool.js'
+import { pool, type Executor } from '../db/pool.js'
 import { dedupKey } from './ids.js'
 import type { Message } from './types.js'
 
@@ -9,8 +9,9 @@ import type { Message } from './types.js'
 export async function findUnconsumedByHash(
   recipient: string,
   contentSha256: string,
+  exec: Executor = pool(),
 ): Promise<Message | null> {
-  const res = await query<Message>(
+  const res = await exec.query<Message>(
     `SELECT m.id, m.ts, m.sender, m.recipient, m.thread, m.type, m.summary,
             m.body_path, m.content_sha256, m.dedup_key, m.origin
      FROM messages m
@@ -27,8 +28,9 @@ export async function findUnconsumedByHash(
 export async function consume(
   messageId: string,
   consumer: string,
+  exec: Executor = pool(),
 ): Promise<{ consumed: boolean }> {
-  const res = await query<{ id: string }>(
+  const res = await exec.query<{ id: string }>(
     `INSERT INTO message_consumptions (message_id, consumer, dedup_key)
      VALUES ($1, $2, $3)
      ON CONFLICT (message_id) DO NOTHING
@@ -36,4 +38,13 @@ export async function consume(
     [messageId, consumer, dedupKey('consume', messageId)],
   )
   return { consumed: (res.rowCount ?? 0) > 0 }
+}
+
+/** True if the message has already been consumed. */
+export async function isConsumed(messageId: string, exec: Executor = pool()): Promise<boolean> {
+  const res = await exec.query<{ one: number }>(
+    `SELECT 1 AS one FROM message_consumptions WHERE message_id = $1`,
+    [messageId],
+  )
+  return (res.rowCount ?? 0) > 0
 }

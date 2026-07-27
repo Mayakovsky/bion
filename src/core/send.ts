@@ -1,4 +1,4 @@
-import { query } from '../db/pool.js'
+import { pool, type Executor } from '../db/pool.js'
 import { sha256, dedupKey } from './ids.js'
 import type { Message } from './types.js'
 
@@ -28,12 +28,12 @@ export interface SendResult {
  * authority, §5). Idempotent on dedup_key. In Phase A this records the row + content hash;
  * the disk mailbox write is layered on in Phase B.
  */
-export async function send(input: SendInput): Promise<SendResult> {
+export async function send(input: SendInput, exec: Executor = pool()): Promise<SendResult> {
   const contentSha = sha256(input.body)
   const key =
     input.dedupKey ?? dedupKey(input.sender, input.recipient, input.thread ?? '', contentSha)
 
-  const inserted = await query<Message>(
+  const inserted = await exec.query<Message>(
     `INSERT INTO messages (sender, recipient, thread, type, summary, body_path, content_sha256, dedup_key, origin)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      ON CONFLICT (dedup_key) DO NOTHING
@@ -56,7 +56,7 @@ export async function send(input: SendInput): Promise<SendResult> {
   }
 
   // Duplicate: return the pre-existing row unchanged.
-  const existing = await query<Message>(
+  const existing = await exec.query<Message>(
     `SELECT id, ts, sender, recipient, thread, type, summary, body_path, content_sha256, dedup_key, origin
      FROM messages WHERE dedup_key = $1`,
     [key],

@@ -20,8 +20,11 @@ export class Coordinator {
     return dispatchNext(this.deps.kov)
   }
 
-  /** Handle a completion signal: detect → update → notify → queue review (idempotent). */
+  /** Handle a completion signal: detect → update → notify → queue review (idempotent, durable). */
   reportCompletion(taskId: string, source = 'kov'): Promise<CompletionOutcome> {
-    return reportCompletion(taskId, source, { desktop: this.deps.desktop, notify: this.deps.notify })
+    return reportCompletion(taskId, source, {
+      mailRoot: this.deps.desktop.mailRoot,
+      notify: this.deps.notify,
+    })
   }
 }

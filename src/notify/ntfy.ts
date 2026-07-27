@@ -19,6 +19,8 @@ export interface NotifyResult {
   status?: number
 }
 
+export type NotifyFn = (input: NotifyInput) => Promise<NotifyResult>
+
 type FetchLike = (input: string, init: RequestInit) => Promise<{ ok: boolean; status: number }>
 
 export interface NotifyOptions {

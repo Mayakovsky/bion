@@ -1,4 +1,4 @@
-import { query } from '../db/pool.js'
+import { pool, type Executor } from '../db/pool.js'
 import { dedupKey, sha256 } from './ids.js'
 import type { BionEvent } from './types.js'
 
@@ -20,11 +20,11 @@ export interface EventResult {
  * Append an event. Idempotent on dedup_key: duplicate completion/watcher signals collapse
  * to a single row (spec §10 risk mitigation).
  */
-export async function recordEvent(input: EventInput): Promise<EventResult> {
+export async function recordEvent(input: EventInput, exec: Executor = pool()): Promise<EventResult> {
   const payload = input.payload ?? {}
   const key = input.dedupKey ?? dedupKey(input.kind, input.source, sha256(JSON.stringify(payload)))
 
-  const inserted = await query<BionEvent>(
+  const inserted = await exec.query<BionEvent>(
     `INSERT INTO events (kind, payload, source, dedup_key)
      VALUES ($1, $2, $3, $4)
      ON CONFLICT (dedup_key) DO NOTHING
@@ -36,7 +36,7 @@ export async function recordEvent(input: EventInput): Promise<EventResult> {
     return { event: inserted.rows[0]!, deduped: false }
   }
 
-  const existing = await query<BionEvent>(
+  const existing = await exec.query<BionEvent>(
     `SELECT id, ts, kind, payload, source, dedup_key FROM events WHERE dedup_key = $1`,
     [key],
   )
