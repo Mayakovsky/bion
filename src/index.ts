@@ -36,6 +36,8 @@ export { commitSignal, branchSignal, readGitHead } from './watchers/gitWatcher.j
 export type { TestSignal, GitSignal, WatchSignal } from './watchers/types.js'
 export { notifyForces, describeNotify } from './notify/ntfy.js'
 export type { NotifyInput, NotifyResult, NotifyOptions } from './notify/ntfy.js'
+export { collectStatus, formatStatus } from './cli/status.js'
+export type { StatusData, StatusOptions } from './cli/status.js'
 export { tick, runDaemon } from './daemon/daemon.js'
 export type { DaemonOptions } from './daemon/daemon.js'
 export { heartbeatPath, writeHeartbeat, readHeartbeat, isDaemonAlive } from './daemon/heartbeat.js'
