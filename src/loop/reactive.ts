@@ -5,6 +5,7 @@ import { createTask, getTask } from '../core/tasks.js'
 import { routePacket } from '../core/routing.js'
 import { notifyDurably } from '../db/outbox.js'
 import { mailboxRoot } from '../mailbox/mailbox.js'
+import { pointer, serialize } from '../comms/protocol.js'
 import type { NotifyFn, NotifyResult } from '../notify/ntfy.js'
 import type { AgentAdapter } from '../adapters/types.js'
 import type { Task } from '../core/types.js'
@@ -122,15 +123,13 @@ async function surface(signal: TestSignal, deps: ReactiveDeps): Promise<{ taskId
       description: `Watcher-detected ${signal.failed}/${signal.total} failing: ${signal.failedTests.join(', ')}`,
     })
   }
-  const reviewBody = [
-    `# Review — failing tests on ${signal.branch}`,
-    '',
-    `Watcher created unratified task **${taskId}** (${signal.failed}/${signal.total} failing).`,
-    `Failing: ${signal.failedTests.join(', ') || '(unnamed)'}`,
-    '',
-    'Ratify the task to bring it into the auto-wake envelope; Bion never ratifies (inv 13).',
-    '',
-  ].join('\n')
+  const reviewBody = serialize(
+    pointer('review', {
+      refs: [`task:${taskId}`, signal.branch, ...signal.failedTests.slice(0, 3)],
+      fields: { task_id: taskId, branch: signal.branch, failed: String(signal.failed), total: String(signal.total) },
+      note: 'watcher: tests red; ratify to enable a fix',
+    }),
+  )
   const routed = await routePacket({ sender: 'bion', recipient: 'desktop', thread: taskId, type: 'review-request', summary: `review ${taskId}`, body: reviewBody, origin: 'bion:watcher', mailRoot: deps.mailRoot })
   // notifyDurably drains — it both publishes the routed review and sends the notification durably.
   const notified = await notifyDurably(
@@ -159,15 +158,13 @@ export async function onTestFailure(signal: TestSignal, deps: ReactiveDeps): Pro
         payload: { taskId: d.task.id, branch: signal.branch, trigger: 'test.failed', runId: signal.runId },
         dedupKey: `reactive.dispatch:${d.task.id}:${signal.runId}`,
       })
-      const body = [
-        `# Auto-fix dispatch — task ${d.task.id}`,
-        '',
-        `Bion auto-dispatched a fix on ratified branch ${signal.branch} (bounded envelope).`,
-        `Failing: ${signal.failedTests.join(', ') || '(unnamed)'}`,
-        '',
-        'Commit within scope proceeds under delegation; push/merge/deploy stop at the Forces gate.',
-        '',
-      ].join('\n')
+      const body = serialize(
+        pointer('autofix', {
+          refs: [`task:${d.task.id}`, signal.branch, ...signal.failedTests.slice(0, 3)],
+          fields: { task_id: d.task.id, branch: signal.branch, failed: String(signal.failed) },
+          note: 'auto-fix ratified branch; tests red; gated acts stop at Forces',
+        }),
+      )
       await deps.kov.dispatch({ sender: 'bion', recipient: 'kov', thread: d.task.id, type: 'autofix', summary: `autofix ${d.task.id}`, body, origin: 'bion:reactive' })
       const notified = await notifyDurably(
         {

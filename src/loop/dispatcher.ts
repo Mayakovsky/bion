@@ -1,5 +1,6 @@
 import { query } from '../db/pool.js'
 import { setTaskStatus } from '../core/tasks.js'
+import { pointer, serialize } from '../comms/protocol.js'
 import type { AgentAdapter, DispatchResult } from '../adapters/types.js'
 import type { Task } from '../core/types.js'
 
@@ -30,19 +31,15 @@ export interface DispatchOutcome {
   dispatch: DispatchResult
 }
 
+// Comms Protocol v1 pointer (E4): the message points; the task row + branch hold the richness.
 function taskPacket(task: Task): string {
-  return [
-    `# Task ${task.id}`,
-    '',
-    `**Title:** ${task.title}`,
-    task.description ? `\n${task.description}` : '',
-    '',
-    task.dependencies.length ? `Depends on: ${task.dependencies.join(', ')}` : 'Depends on: (none)',
-    '',
-    'Dispatched by Bion from the ratified backlog. Commit within scope proceeds under the',
-    'feature-branch delegation; push/merge/tag/deploy/spend stop at the Forces gate.',
-    '',
-  ].join('\n')
+  return serialize(
+    pointer('dispatch', {
+      refs: [`task:${task.id}`, `bion/${task.id}`],
+      fields: { task_id: task.id, branch: `bion/${task.id}`, project: task.project ?? 'none' },
+      note: 'ratified backlog; commit in scope, gated acts stop at Forces',
+    }),
+  )
 }
 
 /**

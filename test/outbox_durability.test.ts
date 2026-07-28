@@ -79,7 +79,7 @@ describe('transactional outbox durability (FDQ-B7 + rename-window)', () => {
     const dpoll = await desktop.pollStatus()
     expect(dpoll.consumed).toHaveLength(1)
     expect(dpoll.flagged).toHaveLength(0)
-    expect(dpoll.consumed[0]!.content).toContain('Review requested')
+    expect(dpoll.consumed[0]!.content).toContain('@intent review')
 
     // Reconcile again → no double-notify, no double-review.
     await reconcile({ notify })

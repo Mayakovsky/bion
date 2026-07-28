@@ -6,6 +6,7 @@ import { getTask, setTaskStatus } from '../core/tasks.js'
 import { send } from '../core/send.js'
 import { enqueueOutbox, drainOutbox } from '../db/outbox.js'
 import { mailboxRoot } from '../mailbox/mailbox.js'
+import { pointer, serialize } from '../comms/protocol.js'
 import type { NotifyFn, NotifyResult } from '../notify/ntfy.js'
 import type { Task } from '../core/types.js'
 
@@ -32,16 +33,15 @@ export interface StageResult {
   reviewMessageId?: string
 }
 
+// Comms Protocol v1 pointer (E4): points at the completed task + the gate; diff is the richness.
 function reviewPacket(task: Task): string {
-  return [
-    `# Review requested — task ${task.id}`,
-    '',
-    `Kov reports task **${task.id}** ("${task.title}") complete.`,
-    '',
-    'Bion has updated state to `done`. This awaits the Forces gate: review the diff, then',
-    'authorize push / merge / tag / deploy. Bion never self-approves a gated action.',
-    '',
-  ].join('\n')
+  return serialize(
+    pointer('review', {
+      refs: [`task:${task.id}`],
+      fields: { task_id: task.id, state: 'done', gate: 'forces' },
+      note: 'kov reports done; review diff, then authorize push/merge',
+    }),
+  )
 }
 
 /**

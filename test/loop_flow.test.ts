@@ -42,7 +42,8 @@ describe('event loop — dispatch → complete → notify → review, hands-free
     // Kov wakes and receives the task packet with zero copy-paste.
     const kovInbox = await kov.pollStatus()
     expect(kovInbox.consumed).toHaveLength(1)
-    expect(kovInbox.consumed[0]!.content).toContain(`Task ${taskId}`)
+    expect(kovInbox.consumed[0]!.content).toContain('@intent dispatch')
+    expect(kovInbox.consumed[0]!.content).toContain(`task_id=${taskId}`)
 
     // 2) Kov reports completion -> detect -> update -> notify -> queue review.
     const first = await bion.reportCompletion(taskId, 'kov')
@@ -56,7 +57,7 @@ describe('event loop — dispatch → complete → notify → review, hands-free
     // Desktop review is queued through Bion and consumable (routed, DB-authoritative).
     const deskInbox = await desktop.pollStatus()
     expect(deskInbox.consumed).toHaveLength(1)
-    expect(deskInbox.consumed[0]!.content).toContain('Review requested')
+    expect(deskInbox.consumed[0]!.content).toContain('@intent review')
 
     // 3) Duplicate completion signal is a pure no-op: no 2nd notify, no 2nd review, still done.
     const second = await bion.reportCompletion(taskId, 'kov')

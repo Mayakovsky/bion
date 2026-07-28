@@ -88,7 +88,7 @@ describe('Auto Mode — ordered projects, pivot-on-block, shadow-gated (E3)', ()
     expect(r.selected?.taskId).toBe(id)
     const kpoll = await kov.pollStatus()
     expect(kpoll.consumed).toHaveLength(1)
-    expect(kpoll.consumed[0]!.content).toContain('Auto-dispatched task')
+    expect(kpoll.consumed[0]!.content).toContain('@intent dispatch')
     expect((await getTask(id))!.status).toBe('in_progress')
   })
 

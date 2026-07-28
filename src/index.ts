@@ -36,6 +36,8 @@ export { commitSignal, branchSignal, readGitHead } from './watchers/gitWatcher.j
 export type { TestSignal, GitSignal, WatchSignal } from './watchers/types.js'
 export { notifyForces, describeNotify } from './notify/ntfy.js'
 export type { NotifyInput, NotifyResult, NotifyOptions } from './notify/ntfy.js'
+export { pointer, serialize, parse, validate, isPointer, NOTE_WORD_CAP } from './comms/protocol.js'
+export type { PointerMessage, ValidationResult } from './comms/protocol.js'
 export { checkUsage, readUsageFile } from './auto/usage.js'
 export type { UsageSnapshot, UsageDeps, UsageCheck } from './auto/usage.js'
 export { autoModeSetting, selectAutoWork, runAutoStep, desktopLaunchRead, autoTick } from './auto/autoMode.js'

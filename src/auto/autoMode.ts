@@ -7,6 +7,7 @@ import { notifyDurably } from '../db/outbox.js'
 import { notifyForces, type NotifyFn, type NotifyResult } from '../notify/ntfy.js'
 import { DesktopAdapter } from '../adapters/desktop.js'
 import { KovAdapter } from '../adapters/kov.js'
+import { pointer, serialize } from '../comms/protocol.js'
 import type { BreakerConfig } from '../loop/reactive.js'
 import type { AgentAdapter, PollResult } from '../adapters/types.js'
 import type { Task } from '../core/types.js'
@@ -96,8 +97,15 @@ async function autoBreakerTripped(deps: AutoDeps): Promise<boolean> {
   return Number(res.rows[0]!.n) >= cfg.max
 }
 
-function taskBody(task: Task): string {
-  return `# Auto-dispatched task ${task.id}\n\n**${task.title}** (project ${task.project ?? 'none'})\n${task.description}\n\nDispatched by Bion Auto Mode from the ratified front. Commit within scope; gated acts stop at Forces.\n`
+// Comms Protocol v1 pointers (E4). `queued` = for Desktop when Forces is present; `dispatch` = Kov.
+function taskBody(task: Task, intent: 'dispatch' | 'queue'): string {
+  return serialize(
+    pointer(intent, {
+      refs: [`task:${task.id}`, `bion/${task.id}`],
+      fields: { task_id: task.id, project: task.project ?? 'none', owner: task.owner ?? 'kov' },
+      note: intent === 'queue' ? 'auto: queued for Forces/Desktop' : 'auto: dispatched from ratified front',
+    }),
+  )
 }
 
 /** One Auto Mode step: pick the next front task and act per mode. */
@@ -125,7 +133,7 @@ export async function runAutoStep(deps: AutoDeps): Promise<AutoOutcome> {
   // mode === 'on'
   if (owner === 'desktop') {
     // Queue for Desktop (read when Forces is present); do not execute. Leaves the front (in_progress).
-    await routePacket({ sender: 'bion', recipient: 'desktop', thread: task.id, type: 'queued-work', summary: `queued ${task.id}`, body: taskBody(task), origin: 'bion:auto', mailRoot: deps.mailRoot })
+    await routePacket({ sender: 'bion', recipient: 'desktop', thread: task.id, type: 'queued-work', summary: `queued ${task.id}`, body: taskBody(task, 'queue'), origin: 'bion:auto', mailRoot: deps.mailRoot })
     await drainOutbox({ notify: deps.notify })
     await setTaskStatus(task.id, 'in_progress')
     return { mode, selected, dispatched: false, queuedForDesktop: true }
@@ -139,7 +147,7 @@ export async function runAutoStep(deps: AutoDeps): Promise<AutoOutcome> {
 
   await setTaskStatus(task.id, 'in_progress')
   await recordEvent({ kind: 'auto.dispatch', source: 'auto', payload: { taskId: task.id, owner: 'kov', project: task.project }, dedupKey: `auto.dispatch:${task.id}` })
-  await deps.kov.dispatch({ sender: 'bion', recipient: 'kov', thread: task.id, type: 'task', summary: `task ${task.id}`, body: taskBody(task), origin: 'bion:auto' })
+  await deps.kov.dispatch({ sender: 'bion', recipient: 'kov', thread: task.id, type: 'task', summary: `task ${task.id}`, body: taskBody(task, 'dispatch'), origin: 'bion:auto' })
   const notified = await notify({ title: `Bion: auto-dispatched ${task.id}`, message: `Auto-dispatched ${task.id} to Kov (project ${task.project ?? 'none'}).`, priority: 4, tags: ['bion', 'auto', 'dispatch'] })
   return { mode, selected, dispatched: true, notified }
 }

@@ -71,7 +71,7 @@ describe('reactive dispatch — bounded envelope (built now, shipped off)', () =
     expect(r1.taskId).toBe(taskId)
     const kpoll = await kov.pollStatus()
     expect(kpoll.consumed).toHaveLength(1)
-    expect(kpoll.consumed[0]!.content).toContain('Auto-fix dispatch')
+    expect(kpoll.consumed[0]!.content).toContain('@intent autofix')
 
     // exactly once: same runId re-feed is a deduped no-op
     const dup = await handleTestSignal(failSig(branch, runId1), deps)
