@@ -94,10 +94,13 @@ describe('reactive dispatch — bounded envelope (built now, shipped off)', () =
 
     // Set the ceiling to exactly one more than the current global count of auto-dispatches,
     // so the first new dispatch reaches it and the second trips.
+    // Use a window wide enough that the breaker's windowed count == the all-time count `base` below
+    // (the DB persists across sessions, so older reactive.dispatch events must be inside the window).
+    const TEN_YEARS_MS = 315_360_000_000
     const base = Number(
       (await query<{ n: string }>(`SELECT count(*)::text AS n FROM events WHERE kind = 'reactive.dispatch'`)).rows[0]!.n,
     )
-    const deps: ReactiveDeps = { kov, mailRoot: root, notify, mode: 'on', breaker: { max: base + 1, windowMs: 10_000_000 } }
+    const deps: ReactiveDeps = { kov, mailRoot: root, notify, mode: 'on', breaker: { max: base + 1, windowMs: TEN_YEARS_MS } }
 
     const rA = await handleTestSignal(failSig(a.branch, randomUUID()), deps)
     expect(rA.dispatched).toBe(true)

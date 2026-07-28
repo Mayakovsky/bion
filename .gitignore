@@ -9,6 +9,9 @@ dist/
 *.tsbuildinfo
 pnpm-debug.log*
 
+# Bion runtime state (daemon heartbeat, mailbox, usage) — never committed
+.bion/
+
 # Local Postgres cluster lives OUTSIDE the repo (~/.bion-pg); never vendored here.
 pgdata/
 *.superpw

@@ -9,6 +9,8 @@
   },
   "scripts": {
     "migrate": "tsx src/db/migrate.ts",
+    "daemon": "tsx src/daemon/daemon.ts",
+    "status": "tsx src/cli/status.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
