@@ -6,6 +6,7 @@ import { reactiveMode } from '../loop/reactive.js'
 import { closePool } from '../db/pool.js'
 import { readGitHead, commitSignal } from '../watchers/gitWatcher.js'
 import { handleGitSignal } from '../watchers/handler.js'
+import { ensureClusterUp, type EnsureClusterOptions } from './cluster.js'
 import { heartbeatPath, writeHeartbeat, type Heartbeat } from './heartbeat.js'
 
 // Persistent daemon (Phase E1) — makes Bion a live process so the outbox, watchers, and (later)
@@ -21,6 +22,8 @@ export interface DaemonOptions {
   reconcileOnStart?: boolean
   /** Poll git HEAD each tick and emit a commit signal (live watcher). Default true. */
   watchGit?: boolean
+  /** Ensure the :5433 cluster is up on start / after a tick error. false disables (tests). */
+  cluster?: EnsureClusterOptions | false
   /** Extension hook (Auto Mode / usage checks are wired in here in E3). */
   onTick?: (tick: number) => Promise<void>
 }
@@ -71,6 +74,18 @@ export async function runDaemon(opts: DaemonOptions = {}): Promise<void> {
   process.on('SIGINT', stop)
   process.on('SIGTERM', stop)
 
+  // Close the post-reboot persistence gap: bring the cluster up before the DB is needed (directive-08).
+  if (opts.cluster !== false) {
+    try {
+      const r = await ensureClusterUp(opts.cluster || {})
+      if (r.started) console.log('[daemon] brought up the :5433 cluster')
+    } catch (err) {
+      console.error('[daemon] HALT: cluster unavailable and could not be started (non-admin):', (err as Error).message)
+      console.error('[daemon] prerequisite: the user-owned cluster at BION_PGDATA — run scripts/provision-db.sh or scripts/pg-start.sh')
+      throw err
+    }
+  }
+
   await recordEvent({
     kind: 'daemon.start',
     source: 'daemon',
@@ -87,6 +102,8 @@ export async function runDaemon(opts: DaemonOptions = {}): Promise<void> {
       await tick(n, opts)
     } catch (err) {
       console.error('[daemon] tick error:', (err as Error).message)
+      // A tick error is often a cluster that went away mid-run — try to bring it back (best-effort).
+      if (opts.cluster !== false) await ensureClusterUp(opts.cluster || {}).catch(() => {})
     }
     // sleep in short slices so SIGINT stops promptly
     for (let waited = 0; waited < interval && running; waited += 1000) await sleep(Math.min(1000, interval))
