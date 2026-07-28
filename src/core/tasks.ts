@@ -10,6 +10,7 @@ export interface CreateTaskInput {
   priority?: number
   dependencies?: string[]
   status?: Task['status']
+  project?: string
 }
 
 async function loadEdges(): Promise<Map<string, string[]>> {
@@ -34,9 +35,9 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
   assertAcyclic(input.id, deps, existing) // throws CycleError on a cycle
 
   const res = await query<Task>(
-    `INSERT INTO tasks (id, title, description, owner, priority, status, dependencies)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
-     RETURNING id, title, description, owner, priority, status, dependencies, ratified, created, updated`,
+    `INSERT INTO tasks (id, title, description, owner, priority, status, dependencies, project)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     RETURNING id, title, description, owner, priority, status, dependencies, ratified, project, created, updated`,
     [
       input.id,
       input.title,
@@ -45,6 +46,7 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
       input.priority ?? 0,
       input.status ?? 'backlog',
       deps,
+      input.project ?? null,
     ],
   )
   return res.rows[0]!
@@ -52,7 +54,7 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
 
 export async function getTask(id: string, exec: Executor = pool()): Promise<Task | null> {
   const res = await exec.query<Task>(
-    `SELECT id, title, description, owner, priority, status, dependencies, ratified, created, updated
+    `SELECT id, title, description, owner, priority, status, dependencies, ratified, project, created, updated
      FROM tasks WHERE id = $1`,
     [id],
   )
@@ -68,7 +70,7 @@ export async function setTaskStatus(
   const res = await exec.query<Task>(
     `UPDATE tasks SET status = $2, updated = now()
      WHERE id = $1 AND status IS DISTINCT FROM $2
-     RETURNING id, title, description, owner, priority, status, dependencies, ratified, created, updated`,
+     RETURNING id, title, description, owner, priority, status, dependencies, ratified, project, created, updated`,
     [id, status],
   )
   if ((res.rowCount ?? 0) > 0) return res.rows[0]!

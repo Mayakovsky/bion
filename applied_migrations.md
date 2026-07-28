@@ -11,3 +11,4 @@ Never edit an applied migration — add a new one.
 | 0003 | `migrations/0003_seed.sql` | Seed the 14 invariants, the FDQ-B ledger (B1/B2/B4/B5 open, B3 resolved), and the `desktop`/`kov` agent envelopes. |
 | 0004 | `migrations/0004_outbox.sql` | Transactional outbox for durable side effects (Phase D1). Runtime role gets SELECT/INSERT + status-only UPDATE (payload immutable). |
 | 0005 | `migrations/0005_outbox_sending.sql` | Add a pre-send `sending` state so notify is at-least-once (directive-04): claim→sending→send→done; a mid-send crash re-sends on reconcile. Publish unchanged (exactly-once). |
+| 0006 | `migrations/0006_projects.sql` | Ordered project list for Auto Mode pivot-on-block (Phase E3): `projects` table (Forces-defined order) + `tasks.project`. Runtime role reads projects; may set a task's project. |

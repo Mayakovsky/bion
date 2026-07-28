@@ -96,7 +96,9 @@ export async function runDaemon(opts: DaemonOptions = {}): Promise<void> {
 
 const isMain = !!process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))
 if (isMain) {
-  runDaemon().catch((err) => {
+  // Real daemon: each tick also runs usage check + one Auto Mode step (both default OFF/no-op).
+  const { autoTick } = await import('../auto/autoMode.js')
+  runDaemon({ onTick: () => autoTick({}) }).catch((err) => {
     console.error('[daemon] fatal:', err)
     process.exit(1)
   })

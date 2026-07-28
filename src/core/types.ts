@@ -23,6 +23,7 @@ export interface Task {
   status: 'backlog' | 'ready' | 'in_progress' | 'blocked' | 'done' | 'failed'
   dependencies: string[]
   ratified: boolean
+  project: string | null
   created: Date
   updated: Date
 }

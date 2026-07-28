@@ -17,3 +17,18 @@ export async function ratifyAsForces(taskId: string): Promise<void> {
     await client.end()
   }
 }
+
+/** Seed a project (owner/Forces lane — the ordered project list is Forces-defined config). */
+export async function seedProject(id: string, ordinal: number): Promise<void> {
+  const client = new Client({ connectionString: env.migrateUrl })
+  await client.connect()
+  try {
+    await client.query(
+      `INSERT INTO projects (id, ordinal, active) VALUES ($1, $2, true)
+       ON CONFLICT (id) DO UPDATE SET ordinal = EXCLUDED.ordinal, active = true`,
+      [id, ordinal],
+    )
+  } finally {
+    await client.end()
+  }
+}

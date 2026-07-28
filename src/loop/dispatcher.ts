@@ -11,7 +11,7 @@ import type { Task } from '../core/types.js'
 export async function selectDispatchable(): Promise<Task[]> {
   const res = await query<Task>(
     `SELECT t.id, t.title, t.description, t.owner, t.priority, t.status,
-            t.dependencies, t.ratified, t.created, t.updated
+            t.dependencies, t.ratified, t.project, t.created, t.updated
      FROM tasks t
      WHERE t.ratified = true
        AND t.status IN ('backlog','ready')
