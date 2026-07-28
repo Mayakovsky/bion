@@ -7,6 +7,7 @@ import { closePool } from '../db/pool.js'
 import { readGitHead, commitSignal } from '../watchers/gitWatcher.js'
 import { handleGitSignal } from '../watchers/handler.js'
 import { ensureClusterUp, type EnsureClusterOptions } from './cluster.js'
+import { acquireLock, releaseLock, pidfilePath } from './lock.js'
 import { heartbeatPath, writeHeartbeat, type Heartbeat } from './heartbeat.js'
 
 // Persistent daemon (Phase E1) — makes Bion a live process so the outbox, watchers, and (later)
@@ -24,6 +25,8 @@ export interface DaemonOptions {
   watchGit?: boolean
   /** Ensure the :5433 cluster is up on start / after a tick error. false disables (tests). */
   cluster?: EnsureClusterOptions | false
+  /** Single-instance pidfile path override (tests isolate this). */
+  pidfile?: string
   /** Extension hook (Auto Mode / usage checks are wired in here in E3). */
   onTick?: (tick: number) => Promise<void>
 }
@@ -67,6 +70,17 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 /** Run the daemon loop until SIGINT/SIGTERM. */
 export async function runDaemon(opts: DaemonOptions = {}): Promise<void> {
   console.log('[daemon] runDaemon entered') // directive-13 step-1 trace
+
+  // Single-instance lock (directive-15) FIRST — before touching anything. First-wins: a live
+  // incumbent is sacrosanct; we decline and exit 0 without a heartbeat/cluster/reconcile/DB write.
+  const lockPath = opts.pidfile ?? pidfilePath()
+  const lock = acquireLock(lockPath)
+  if (!lock.acquired) {
+    console.log(`[daemon] already running, pid ${lock.incumbent} — declining`)
+    return
+  }
+  if (lock.reclaimed) console.log('[daemon] reclaimed a stale pidfile')
+
   const interval = opts.intervalMs ?? 45_000
   let running = true
   const stop = () => {
@@ -122,6 +136,7 @@ export async function runDaemon(opts: DaemonOptions = {}): Promise<void> {
     for (let waited = 0; waited < interval && running; waited += 1000) await sleep(Math.min(1000, interval))
   }
   await closePool()
+  releaseLock(lockPath) // clean shutdown removes our pidfile (only if still ours)
 }
 
 const isMain = !!process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))
