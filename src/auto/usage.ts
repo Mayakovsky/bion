@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { repoPath } from '../paths.js'
 import { recordEvent } from '../core/events.js'
 import { notifyDurably } from '../db/outbox.js'
 import { notifyForces, type NotifyFn, type NotifyResult } from '../notify/ntfy.js'
@@ -31,7 +31,7 @@ export interface UsageCheck {
 }
 
 export function readUsageFile(path?: string): UsageSnapshot | null {
-  const p = path ?? join(process.cwd(), '.bion', 'usage.json')
+  const p = path ?? repoPath('.bion', 'usage.json')
   if (!existsSync(p)) return null
   try {
     return JSON.parse(readFileSync(p, 'utf8')) as UsageSnapshot

@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url'
 import { existsSync, readFileSync } from 'node:fs'
-import { resolve, join } from 'node:path'
+import { resolve } from 'node:path'
+import { repoPath } from '../paths.js'
 import { query, closePool } from '../db/pool.js'
 import { selectDispatchable } from '../loop/dispatcher.js'
 import { reactiveMode } from '../loop/reactive.js'
@@ -23,7 +24,7 @@ export interface StatusOptions {
 
 export async function collectStatus(opts: StatusOptions = {}): Promise<StatusData> {
   const hbPath = opts.heartbeatPath ?? heartbeatPath()
-  const usagePath = opts.usagePath ?? join(process.cwd(), '.bion', 'usage.json')
+  const usagePath = opts.usagePath ?? repoPath('.bion', 'usage.json')
 
   const [outbox, tasks, reactive, dispatchable] = await Promise.all([
     query<{ status: string; n: string }>(`SELECT status, count(*)::text AS n FROM outbox GROUP BY status`),

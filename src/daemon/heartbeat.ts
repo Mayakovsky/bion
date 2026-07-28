@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname } from 'node:path'
+import { repoPath } from '../paths.js'
 
 // Daemon liveness heartbeat — a small file the daemon rewrites each tick so `bion status`
 // (and anything else) can tell whether Bion is running and how fresh it is.
@@ -12,7 +13,7 @@ export interface Heartbeat {
 }
 
 export function heartbeatPath(root?: string): string {
-  return root ?? join(process.cwd(), '.bion', 'daemon', 'heartbeat.json')
+  return root ?? repoPath('.bion', 'daemon', 'heartbeat.json')
 }
 
 export function writeHeartbeat(hb: Heartbeat, path = heartbeatPath()): void {

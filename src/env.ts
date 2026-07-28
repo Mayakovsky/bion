@@ -1,8 +1,14 @@
 import { config } from 'dotenv'
-import { resolve } from 'node:path'
+import { repoPath } from './paths.js'
 
-// Load .env.local from the repo root (real env vars, if set, take precedence).
-config({ path: resolve(process.cwd(), '.env.local') })
+/** Absolute path to .env.local, resolved relative to the repo root (NOT process.cwd()). */
+export function resolveEnvPath(): string {
+  return repoPath('.env.local')
+}
+
+// Load .env.local module-relative so it loads identically from any cwd (directive-11).
+// Real env vars, if already set, take precedence (dotenv does not override by default).
+config({ path: resolveEnvPath() })
 
 function required(name: string): string {
   const v = process.env[name]

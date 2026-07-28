@@ -52,5 +52,6 @@ export { heartbeatPath, writeHeartbeat, readHeartbeat, isDaemonAlive } from './d
 export type { Heartbeat } from './daemon/heartbeat.js'
 export { runMigrations } from './db/migrate.js'
 export { query, withTransaction, closePool, pool } from './db/pool.js'
-export { env, parseDbUrl } from './env.js'
+export { env, parseDbUrl, resolveEnvPath } from './env.js'
+export { repoRoot, repoPath } from './paths.js'
 export type * from './core/types.js'

@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+import { repoPath } from '../paths.js'
 import { query } from '../db/pool.js'
 import type { QueryHit } from './types.js'
 
@@ -45,7 +46,7 @@ export async function queryState(q: string, opts: QueryStateOptions = {}): Promi
   )
 
   const diskHits =
-    opts.grepDisk === false ? [] : grepMailbox(q, opts.mailboxRoot ?? join(process.cwd(), '.bion', 'mail'))
+    opts.grepDisk === false ? [] : grepMailbox(q, opts.mailboxRoot ?? repoPath('.bion', 'mail'))
 
   return { hits: res.rows, diskHits }
 }

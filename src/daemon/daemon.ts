@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
-import { drainOutbox, reconcile } from '../db/outbox.js'
+import { drainOutbox, reconcile, notifyDurably } from '../db/outbox.js'
 import { recordEvent } from '../core/events.js'
 import { reactiveMode } from '../loop/reactive.js'
 import { closePool } from '../db/pool.js'
@@ -86,12 +86,24 @@ export async function runDaemon(opts: DaemonOptions = {}): Promise<void> {
     }
   }
 
+  const startedAt = new Date().toISOString()
   await recordEvent({
     kind: 'daemon.start',
     source: 'daemon',
     payload: { pid: process.pid, reactive: reactiveMode(), auto: autoMode() },
-    dedupKey: `daemon.start:${process.pid}:${new Date().toISOString()}`,
+    dedupKey: `daemon.start:${process.pid}:${startedAt}`,
   })
+  // Ping Forces so a successful launch is observable on the phone, not just in the DB (directive-11).
+  // Durable + at-least-once; dry-run (no ping) when BION_NTFY_URL is unset. Non-fatal on failure.
+  await notifyDurably(
+    {
+      title: 'Bion daemon started',
+      message: `daemon up — reactive=${reactiveMode()} auto=${autoMode()} pid=${process.pid}`,
+      priority: 3,
+      tags: ['bion', 'daemon'],
+    },
+    `notify:daemon.start:${process.pid}:${startedAt}`,
+  ).catch((err) => console.error('[daemon] start-ping failed (non-fatal):', (err as Error).message))
   // On restart, recover any intents left in flight by a prior crash (production posture).
   if (opts.reconcileOnStart ?? true) await reconcile()
 

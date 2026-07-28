@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { repoPath } from '../paths.js'
 
 // Disk mailbox: .bion/mail/<recipient>/{unread,read,flagged}/ — append-only markdown packets.
 // Writes are atomic: staged in .tmp/ then renamed into unread/ (rename is atomic on one volume),
@@ -9,7 +10,7 @@ import { dirname, join } from 'node:path'
 export type Box = 'unread' | 'read' | 'flagged'
 
 export function mailboxRoot(root?: string): string {
-  return root ?? process.env.BION_MAIL_ROOT ?? join(process.cwd(), '.bion', 'mail')
+  return root ?? process.env.BION_MAIL_ROOT ?? repoPath('.bion', 'mail')
 }
 
 function boxDir(root: string, recipient: string, box: Box): string {

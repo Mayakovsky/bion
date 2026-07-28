@@ -22,7 +22,9 @@ describe('seeded ledgers are queryable', () => {
   })
 
   it('invariant ledger is FTS-queryable', async () => {
-    const { hits } = await queryState('append-only', { grepDisk: false })
+    // 'autognostic' is distinctive to INV-7, so accumulated decisions/messages can't crowd it out of
+    // the ranked LIMIT (unlike a common term such as 'append-only').
+    const { hits } = await queryState('autognostic', { grepDisk: false })
     expect(hits.some((h) => h.kind === 'invariant')).toBe(true)
   })
 
