@@ -66,6 +66,7 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
 /** Run the daemon loop until SIGINT/SIGTERM. */
 export async function runDaemon(opts: DaemonOptions = {}): Promise<void> {
+  console.log('[daemon] runDaemon entered') // directive-13 step-1 trace
   const interval = opts.intervalMs ?? 45_000
   let running = true
   const stop = () => {
@@ -124,6 +125,7 @@ export async function runDaemon(opts: DaemonOptions = {}): Promise<void> {
 }
 
 const isMain = !!process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))
+console.log('[daemon] module loaded, isMain=', isMain) // directive-13 step-1 trace
 if (isMain) {
   // Real daemon: each tick also runs usage check + one Auto Mode step (both default OFF/no-op).
   const { autoTick } = await import('../auto/autoMode.js')

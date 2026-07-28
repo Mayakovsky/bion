@@ -13,8 +13,12 @@ $repo = Split-Path -Parent $PSScriptRoot
 $node = (Get-Command node).Source
 $taskName = 'BionDaemon'
 
-$action = New-ScheduledTaskAction -Execute $node `
-  -Argument "--import tsx `"$repo\src\daemon\daemon.ts`"" -WorkingDirectory $repo
+# Launch through run-daemon.ps1 so the task's stdout+stderr are tee'd to .bion/daemon/daemon.log
+# (Task Scheduler otherwise discards them). The wrapper invokes node --import tsx daemon.ts.
+$psExe = (Get-Command powershell).Source
+$wrapper = Join-Path $repo 'scripts\run-daemon.ps1'
+$action = New-ScheduledTaskAction -Execute $psExe `
+  -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$wrapper`"" -WorkingDirectory $repo
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
   -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero)
