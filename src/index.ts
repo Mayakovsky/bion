@@ -50,6 +50,8 @@ export { autoModeSetting, selectAutoWork, runAutoStep, desktopLaunchRead, autoTi
 export type { AutoMode, AutoWork, AutoDeps, AutoOutcome } from './auto/autoMode.js'
 export { collectStatus, formatStatus } from './cli/status.js'
 export type { StatusData, StatusOptions } from './cli/status.js'
+export { collectCost, formatCost } from './cli/cost.js'
+export type { CostData, CostScale, CostBreakdownEntry, CostOptions } from './cli/cost.js'
 export { tick, runDaemon } from './daemon/daemon.js'
 export type { DaemonOptions } from './daemon/daemon.js'
 export { ensureClusterUp, canConnect, startCluster } from './daemon/cluster.js'
