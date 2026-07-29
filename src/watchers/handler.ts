@@ -1,5 +1,6 @@
 import { recordEvent } from '../core/events.js'
 import { onTestFailure, reactiveMode, type ReactiveDeps, type ReactiveMode, type ReactiveOutcome } from '../loop/reactive.js'
+import { collectKovCost } from '../cost/kovCollector.js'
 import type { BionEvent } from '../core/types.js'
 import type { GitSignal, TestSignal } from './types.js'
 
@@ -36,5 +37,18 @@ export async function handleGitSignal(signal: GitSignal): Promise<{ duplicate: b
     payload: { branch: signal.branch, sha: signal.sha },
     dedupKey: `git:${signal.event}:${signal.sha}`,
   })
+
+  // directive-18 addendum: a commit is the closest thing Bion already observes to "Kov just did
+  // a turn" — the trigger the collector was missing. Best-effort, same posture as
+  // recordDesktopCostSafely: a scan failure must never affect the git-signal path. Skipped on a
+  // duplicate signal (already-seen commit) so a re-run doesn't do redundant work.
+  if (!deduped && signal.event === 'commit') {
+    try {
+      await collectKovCost()
+    } catch (err) {
+      console.error('[cost] kov collector scan failed (git signal unaffected):', (err as Error).message)
+    }
+  }
+
   return { duplicate: deduped, event }
 }
