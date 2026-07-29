@@ -1,7 +1,22 @@
 import pg from 'pg'
+import { execFileSync } from 'node:child_process'
+import { join } from 'node:path'
 import { env } from '../src/env.js'
+import { repoRoot } from '../src/paths.js'
 
 const { Client } = pg
+
+/**
+ * Run an owner-lane shell script under scripts/ (BION_MIGRATE_URL) and return its stdout.
+ * Used to round-trip-test the actual .sh artifacts (create-project.sh, ratify-project.sh),
+ * not a TS re-implementation of their SQL — the point is proving the real script works.
+ */
+export function runOwnerScript(script: string, args: string[]): string {
+  return execFileSync('bash', [join(repoRoot(), 'scripts', script), ...args], {
+    env: { ...process.env, BION_MIGRATE_URL: env.migrateUrl },
+    encoding: 'utf8',
+  })
+}
 
 /**
  * Ratify a task via the owner/Forces lane (BION_MIGRATE_URL). Mirrors scripts/ratify-task.sh.
