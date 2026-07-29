@@ -63,6 +63,9 @@ export interface Agent {
   authority: Record<string, unknown>
 }
 
+/** Which agent seat a cost-bearing event's tokens belong to (directive-18). */
+export type CostSeat = 'kov' | 'desktop'
+
 export interface BionEvent {
   id: string
   ts: Date
@@ -70,6 +73,14 @@ export interface BionEvent {
   payload: Record<string, unknown>
   source: string
   dedup_key: string
+  /** Cost attribution (directive-18) — null on non-cost events. */
+  target_seat: CostSeat | null
+  trigger_class: string | null
+  model: string | null
+  tokens_in: number | null
+  tokens_out: number | null
+  est_cost: number | null
+  is_approximate: boolean | null
 }
 
 export interface QueryHit {

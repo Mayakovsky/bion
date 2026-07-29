@@ -7,6 +7,7 @@ import { send } from '../core/send.js'
 import { enqueueOutbox, drainOutbox } from '../db/outbox.js'
 import { mailboxRoot } from '../mailbox/mailbox.js'
 import { pointer, serialize } from '../comms/protocol.js'
+import { recordDesktopCostSafely } from '../cost/desktopCollector.js'
 import type { NotifyFn, NotifyResult } from '../notify/ntfy.js'
 import type { Task } from '../core/types.js'
 
@@ -33,6 +34,11 @@ export interface StageResult {
   reviewMessageId?: string
 }
 
+interface StageTxResult extends StageResult {
+  /** Internal-only: the review packet body, kept just long enough to size the post-commit cost estimate. */
+  reviewBody?: string
+}
+
 // Comms Protocol v1 pointer (E4): points at the completed task + the gate; diff is the richness.
 function reviewPacket(task: Task): string {
   return serialize(
@@ -56,7 +62,7 @@ export async function stageCompletion(
   source: string,
   opts: { mailRoot?: string } = {},
 ): Promise<StageResult> {
-  return withTransaction(async (client) => {
+  const result = await withTransaction<StageTxResult>(async (client) => {
     const { deduped } = await recordEvent(
       { kind: 'task.completed', source, payload: { taskId }, dedupKey: `task.completed:${taskId}` },
       client,
@@ -94,8 +100,22 @@ export async function stageCompletion(
         client,
       )
     }
-    return { duplicate: false, task, reviewPath: finalPath, reviewMessageId: message.id }
+    return { duplicate: false, task, reviewPath: finalPath, reviewMessageId: message.id, reviewBody: body }
   })
+
+  // Best-effort, OUTSIDE the transaction: a cost-estimate failure must never re-open or block a
+  // completion that already committed (directive-18, same non-blocking rule as routePacket).
+  if (!result.duplicate && result.reviewMessageId) {
+    await recordDesktopCostSafely({
+      body: result.reviewBody!,
+      sender: 'bion',
+      recipient: 'desktop',
+      triggerClass: 'review-request',
+      messageId: result.reviewMessageId,
+    })
+  }
+
+  return result
 }
 
 /**

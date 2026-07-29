@@ -4,6 +4,7 @@ import { withTransaction } from '../db/pool.js'
 import { enqueueOutbox } from '../db/outbox.js'
 import { mailboxRoot } from '../mailbox/mailbox.js'
 import { send } from './send.js'
+import { recordDesktopCostSafely } from '../cost/desktopCollector.js'
 import type { Message } from './types.js'
 
 export interface RouteInput {
@@ -33,7 +34,7 @@ export interface RouteResult {
 export async function routePacket(input: RouteInput): Promise<RouteResult> {
   const filename = `${randomUUID()}.md`
   const finalPath = join(mailboxRoot(input.mailRoot), input.recipient, 'unread', filename)
-  return withTransaction(async (client) => {
+  const result = await withTransaction(async (client) => {
     const { message, deduped } = await send(
       {
         sender: input.sender,
@@ -59,4 +60,18 @@ export async function routePacket(input: RouteInput): Promise<RouteResult> {
     }
     return { message, deduped, finalPath }
   })
+
+  // Best-effort, OUTSIDE the transaction and on the runtime pool, not the checked-out client:
+  // a cost-estimate failure must never roll back or block the actual dispatch (directive-18).
+  if (!result.deduped) {
+    await recordDesktopCostSafely({
+      body: input.body,
+      sender: input.sender,
+      recipient: input.recipient,
+      triggerClass: input.type ?? 'packet',
+      messageId: result.message.id,
+    })
+  }
+
+  return result
 }
