@@ -6,6 +6,7 @@ import {
   runAutoStep,
   selectAutoWork,
   desktopLaunchRead,
+  autoModeSetting,
   createTask,
   getTask,
   setTaskStatus,
@@ -44,6 +45,32 @@ async function cleanupRatifiedTask(t: { id: string; project: string }): Promise<
   await deleteTasksAsForces([t.id])
   await deleteProjectAsForces(t.project)
 }
+
+describe('Auto Mode default posture (directive-20: off -> shadow)', () => {
+  it('autoModeSetting() falls back to shadow when BION_AUTO_MODE is fully unset', () => {
+    const had = 'BION_AUTO_MODE' in process.env
+    const prior = process.env.BION_AUTO_MODE
+    delete process.env.BION_AUTO_MODE
+    try {
+      expect(autoModeSetting()).toBe('shadow')
+    } finally {
+      if (had) process.env.BION_AUTO_MODE = prior
+    }
+  })
+
+  it('off and on remain fully available as explicit settings', () => {
+    const prior = process.env.BION_AUTO_MODE
+    try {
+      process.env.BION_AUTO_MODE = 'off'
+      expect(autoModeSetting()).toBe('off')
+      process.env.BION_AUTO_MODE = 'on'
+      expect(autoModeSetting()).toBe('on')
+    } finally {
+      if (prior === undefined) delete process.env.BION_AUTO_MODE
+      else process.env.BION_AUTO_MODE = prior
+    }
+  })
+})
 
 describe('Auto Mode — ordered projects, pivot-on-block, shadow-gated (E3)', () => {
   it('pivot-on-block: skips a blocked earlier-project task and advances to the next', async () => {
