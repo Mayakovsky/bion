@@ -47,3 +47,26 @@ export async function seedProject(id: string, ordinal: number): Promise<void> {
     await client.end()
   }
 }
+
+/** Delete scratch tasks (owner/Forces lane — bion_rw has no DELETE grant on tasks). Test teardown only. */
+export async function deleteTasksAsForces(taskIds: string[]): Promise<void> {
+  if (taskIds.length === 0) return
+  const client = new Client({ connectionString: env.migrateUrl })
+  await client.connect()
+  try {
+    await client.query('DELETE FROM tasks WHERE id = ANY($1)', [taskIds])
+  } finally {
+    await client.end()
+  }
+}
+
+/** Delete a scratch project (owner/Forces lane — bion_rw has no DELETE grant on projects). Test teardown only. */
+export async function deleteProjectAsForces(id: string): Promise<void> {
+  const client = new Client({ connectionString: env.migrateUrl })
+  await client.connect()
+  try {
+    await client.query('DELETE FROM projects WHERE id = $1', [id])
+  } finally {
+    await client.end()
+  }
+}

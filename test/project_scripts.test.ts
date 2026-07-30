@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { randomUUID } from 'node:crypto'
 import { createTask, getTask, query } from '../src/index.js'
-import { runOwnerScript } from './helpers.js'
+import { runOwnerScript, deleteTasksAsForces, deleteProjectAsForces } from './helpers.js'
 
 // directive-19: owner-lane scripts, tested as the real artifacts (not a TS re-implementation of
 // their SQL) — round-tripped against a scratch project + tasks.
@@ -35,19 +35,26 @@ describe('scripts/create-project.sh + scripts/ratify-project.sh (owner lane)', (
     const inProject2 = await createTask({ id: `t-${randomUUID()}`, title: 'in-project b', project: projectId })
     const outsideProject = await createTask({ id: `t-${randomUUID()}`, title: 'elsewhere' })
 
-    expect(inProject1.ratified).toBe(false)
-    expect(inProject2.ratified).toBe(false)
+    try {
+      expect(inProject1.ratified).toBe(false)
+      expect(inProject2.ratified).toBe(false)
 
-    const out = runOwnerScript('ratify-project.sh', [projectId])
-    expect(out).toContain(inProject1.id)
-    expect(out).toContain(inProject2.id)
+      const out = runOwnerScript('ratify-project.sh', [projectId])
+      expect(out).toContain(inProject1.id)
+      expect(out).toContain(inProject2.id)
 
-    expect((await getTask(inProject1.id))!.ratified).toBe(true)
-    expect((await getTask(inProject2.id))!.ratified).toBe(true)
-    expect((await getTask(outsideProject.id))!.ratified).toBe(false) // untouched
+      expect((await getTask(inProject1.id))!.ratified).toBe(true)
+      expect((await getTask(inProject2.id))!.ratified).toBe(true)
+      expect((await getTask(outsideProject.id))!.ratified).toBe(false) // untouched
 
-    // idempotent: a second run ratifies nothing new (already-ratified tasks excluded by the WHERE)
-    const second = runOwnerScript('ratify-project.sh', [projectId])
-    expect(second).not.toContain(inProject1.id)
+      // idempotent: a second run ratifies nothing new (already-ratified tasks excluded by the WHERE)
+      const second = runOwnerScript('ratify-project.sh', [projectId])
+      expect(second).not.toContain(inProject1.id)
+    } finally {
+      // ratified tasks attached to an active project are exactly what selectAutoWork() selects —
+      // must not survive the test regardless of assertion outcome (directive-19 addendum).
+      await deleteTasksAsForces([inProject1.id, inProject2.id])
+      await deleteProjectAsForces(projectId)
+    }
   })
 })
