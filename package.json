@@ -12,6 +12,8 @@
     "daemon": "tsx src/daemon/daemon.ts",
     "status": "tsx src/cli/status.ts",
     "cost": "tsx src/cli/cost.ts",
+    "task": "tsx src/cli/task.ts",
+    "auto-report": "tsx src/cli/autoReport.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",

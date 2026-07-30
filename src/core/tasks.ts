@@ -52,6 +52,39 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
   return res.rows[0]!
 }
 
+export interface ListTasksFilter {
+  project?: string
+  status?: Task['status']
+  /** undefined = all (default) */
+  ratified?: boolean
+}
+
+/** Filtered task listing for `bion task list`. */
+export async function listTasks(filter: ListTasksFilter = {}, exec: Executor = pool()): Promise<Task[]> {
+  const clauses: string[] = []
+  const params: unknown[] = []
+  if (filter.project !== undefined) {
+    params.push(filter.project)
+    clauses.push(`project = $${params.length}`)
+  }
+  if (filter.status !== undefined) {
+    params.push(filter.status)
+    clauses.push(`status = $${params.length}`)
+  }
+  if (filter.ratified !== undefined) {
+    params.push(filter.ratified)
+    clauses.push(`ratified = $${params.length}`)
+  }
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''
+  const res = await exec.query<Task>(
+    `SELECT id, title, description, owner, priority, status, dependencies, ratified, project, created, updated
+     FROM tasks ${where}
+     ORDER BY priority DESC, created ASC`,
+    params,
+  )
+  return res.rows
+}
+
 export async function getTask(id: string, exec: Executor = pool()): Promise<Task | null> {
   const res = await exec.query<Task>(
     `SELECT id, title, description, owner, priority, status, dependencies, ratified, project, created, updated

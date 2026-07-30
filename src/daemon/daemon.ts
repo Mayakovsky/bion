@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import { drainOutbox, reconcile, notifyDurably } from '../db/outbox.js'
 import { recordEvent } from '../core/events.js'
 import { reactiveMode } from '../loop/reactive.js'
+import { autoModeSetting } from '../auto/autoMode.js'
 import { closePool } from '../db/pool.js'
 import { readGitHead, commitSignal } from '../watchers/gitWatcher.js'
 import { handleGitSignal } from '../watchers/handler.js'
@@ -14,8 +15,9 @@ import { heartbeatPath, writeHeartbeat, type Heartbeat } from './heartbeat.js'
 // the Auto Mode loop actually run. Local-while-machine-is-up is the accepted posture (B9); the
 // scheduled-task-at-logon mechanism (scripts/install-daemon.ps1) restarts it across logout/restart.
 //
-// SAFE BY DEFAULT: with BION_AUTO_MODE=off it auto-dispatches nothing; with BION_REACTIVE_DISPATCH
-// at shadow the reactive path only logs. The tick just drains durable side effects + heartbeats.
+// SAFE BY DEFAULT: with BION_AUTO_MODE unset/shadow (directive-20) it logs would-dispatch and fires
+// nothing; with BION_REACTIVE_DISPATCH at shadow the reactive path only logs. The tick just drains
+// durable side effects + heartbeats.
 
 export interface DaemonOptions {
   intervalMs?: number
@@ -29,10 +31,6 @@ export interface DaemonOptions {
   pidfile?: string
   /** Extension hook (Auto Mode / usage checks are wired in here in E3). */
   onTick?: (tick: number) => Promise<void>
-}
-
-function autoMode(): string {
-  return (process.env.BION_AUTO_MODE ?? 'off').toLowerCase()
 }
 
 // Live git watcher: emit a commit signal when HEAD moves. Idempotent by sha; lastSha avoids a
@@ -59,7 +57,7 @@ export async function tick(n: number, opts: DaemonOptions = {}): Promise<Heartbe
     pid: process.pid,
     ts: new Date().toISOString(),
     tick: n,
-    mode: { reactive: reactiveMode(), auto: autoMode() },
+    mode: { reactive: reactiveMode(), auto: autoModeSetting() },
   }
   writeHeartbeat(hb, opts.heartbeatPath ?? heartbeatPath())
   return hb
@@ -105,7 +103,7 @@ export async function runDaemon(opts: DaemonOptions = {}): Promise<void> {
   await recordEvent({
     kind: 'daemon.start',
     source: 'daemon',
-    payload: { pid: process.pid, reactive: reactiveMode(), auto: autoMode() },
+    payload: { pid: process.pid, reactive: reactiveMode(), auto: autoModeSetting() },
     dedupKey: `daemon.start:${process.pid}:${startedAt}`,
   })
   // Ping Forces so a successful launch is observable on the phone, not just in the DB (directive-11).
@@ -113,7 +111,7 @@ export async function runDaemon(opts: DaemonOptions = {}): Promise<void> {
   await notifyDurably(
     {
       title: 'Bion daemon started',
-      message: `daemon up — reactive=${reactiveMode()} auto=${autoMode()} pid=${process.pid}`,
+      message: `daemon up — reactive=${reactiveMode()} auto=${autoModeSetting()} pid=${process.pid}`,
       priority: 3,
       tags: ['bion', 'daemon'],
     },
@@ -142,7 +140,7 @@ export async function runDaemon(opts: DaemonOptions = {}): Promise<void> {
 const isMain = !!process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))
 console.log('[daemon] module loaded, isMain=', isMain) // directive-13 step-1 trace
 if (isMain) {
-  // Real daemon: each tick also runs usage check + one Auto Mode step (both default OFF/no-op).
+  // Real daemon: each tick also runs usage check + one Auto Mode step (default shadow: logs, no dispatch).
   const { autoTick } = await import('../auto/autoMode.js')
   runDaemon({ onTick: () => autoTick({}) }).catch((err) => {
     console.error('[daemon] fatal:', err)

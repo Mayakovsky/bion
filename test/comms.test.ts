@@ -14,7 +14,7 @@ import {
   listInvariants,
   listFdqs,
 } from '../src/index.js'
-import { ratifyAsForces } from './helpers.js'
+import { ratifyAsForces, deleteTasksAsForces } from './helpers.js'
 
 describe('Comms Protocol v1 (E4)', () => {
   it('serialize → parse round-trips a pointer message', () => {
@@ -34,17 +34,21 @@ describe('Comms Protocol v1 (E4)', () => {
     const root = join(tmpdir(), `bion-mail-${randomUUID()}`)
     const kov = new KovAdapter({ mailRoot: root })
     const id = `t-${randomUUID()}`
-    await createTask({ id, title: 'conformance', priority: 9_000_000 }) // top of the ratified backlog
-    await ratifyAsForces(id)
+    try {
+      await createTask({ id, title: 'conformance', priority: 9_000_000 }) // top of the ratified backlog
+      await ratifyAsForces(id)
 
-    const out = await dispatchNext(kov)
-    expect(out?.task.id).toBe(id)
-    const poll = await kov.pollStatus()
-    const msg = parse(poll.consumed[0]!.content)
-    expect(validate(msg).ok).toBe(true)
-    expect(msg.intent).toBe('dispatch')
-    expect(msg.fields.task_id).toBe(id)
-    expect(msg.refs.length).toBeGreaterThan(0)
+      const out = await dispatchNext(kov)
+      expect(out?.task.id).toBe(id)
+      const poll = await kov.pollStatus()
+      const msg = parse(poll.consumed[0]!.content)
+      expect(validate(msg).ok).toBe(true)
+      expect(msg.intent).toBe('dispatch')
+      expect(msg.fields.task_id).toBe(id)
+      expect(msg.refs.length).toBeGreaterThan(0)
+    } finally {
+      await deleteTasksAsForces([id])
+    }
   })
 
   it('governance ledgers stay human-readable prose (carve-out), not pointers', async () => {

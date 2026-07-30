@@ -6,6 +6,13 @@
 # (BION_MIGRATE_URL / bion_owner). Bion never runs this itself (inv 13; directive-01 ruling 3).
 #
 # Usage: BION_MIGRATE_URL=... bash scripts/ratify-task.sh <task-id>
+#
+# NOTE (fixed alongside directive-19): on this psql build, `-v`-substituted variables in a
+# `-c "..."` command are silently NOT interpolated (`:'id'` reached the server literally and
+# errored) — substitution only works reading from stdin/-f. The connection string must also come
+# AFTER the flags, or getopt stops parsing there and everything after is "ignored" as an extra
+# argument (this script previously put it first — untested via this path, since test/helpers.ts's
+# ratifyAsForces calls the SQL directly rather than shelling out, so the break went unnoticed).
 set -euo pipefail
 PGBIN="${BION_PGBIN:-/c/Program Files/PostgreSQL/16/bin}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -20,5 +27,6 @@ if [ -z "${BION_MIGRATE_URL:-}" ] && [ -f "$REPO_ROOT/.env.local" ]; then
 fi
 [ -n "${BION_MIGRATE_URL:-}" ] || { echo "BION_MIGRATE_URL not set" >&2; exit 2; }
 
-"$PGBIN/psql" "$BION_MIGRATE_URL" -v id="$TASK_ID" -c \
-  "UPDATE tasks SET ratified = true, updated = now() WHERE id = :'id' RETURNING id, title, ratified;"
+"$PGBIN/psql" -v id="$TASK_ID" "$BION_MIGRATE_URL" <<'SQL'
+UPDATE tasks SET ratified = true, updated = now() WHERE id = :'id' RETURNING id, title, ratified;
+SQL

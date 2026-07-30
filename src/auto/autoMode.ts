@@ -20,12 +20,17 @@ import { checkUsage, type UsageDeps } from './usage.js'
 //           Desktop-owned items are QUEUED for when Forces is present, not executed.
 // Pivot-on-block: walk projects by ordinal, tasks by priority, skipping blocked work — so a
 // roadblock on one project advances the front to the next project's next ratified task.
+//
+// Directive-20: the unset/unrecognized fallback moved off -> shadow (Forces' explicit call, not a
+// bugfix — the "shipped off" posture above was Phase E3's original stance). `off` and `on` remain
+// fully available as explicit settings; this only changes what happens when nobody said anything.
+// `on` (real autonomous dispatch) is untouched — this is not a step toward defaulting to `on`.
 
 export type AutoMode = 'off' | 'shadow' | 'on'
 
 export function autoModeSetting(): AutoMode {
-  const m = (process.env.BION_AUTO_MODE ?? 'off').toLowerCase()
-  return m === 'shadow' ? 'shadow' : m === 'on' ? 'on' : 'off'
+  const m = (process.env.BION_AUTO_MODE ?? 'shadow').toLowerCase()
+  return m === 'off' ? 'off' : m === 'on' ? 'on' : 'shadow'
 }
 
 export interface AutoWork {
