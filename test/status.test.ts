@@ -11,24 +11,28 @@ import {
   enqueueOutbox,
   writeHeartbeat,
 } from '../src/index.js'
-import { ratifyAsForces } from './helpers.js'
+import { ratifyAsForces, deleteTasksAsForces } from './helpers.js'
 
 describe('bion status (E2) reports accurate live state', () => {
   it('reflects a newly ratified backlog task and a pending outbox entry', async () => {
     const before = await collectStatus()
 
     const taskId = `t-${randomUUID()}`
-    await createTask({ id: taskId, title: 'status probe' })
-    await ratifyAsForces(taskId)
-    await withTransaction((c) =>
-      enqueueOutbox({ kind: 'notify', dedupKey: `notify:status:${randomUUID()}`, payload: { title: 't', message: 'm', priority: 3, tags: [] } }, c),
-    )
+    try {
+      await createTask({ id: taskId, title: 'status probe' })
+      await ratifyAsForces(taskId)
+      await withTransaction((c) =>
+        enqueueOutbox({ kind: 'notify', dedupKey: `notify:status:${randomUUID()}`, payload: { title: 't', message: 'm', priority: 3, tags: [] } }, c),
+      )
 
-    const after = await collectStatus()
-    expect(after.tasks.ratifiedBacklog).toBe(before.tasks.ratifiedBacklog + 1)
-    expect(after.tasks.dispatchable).toBe(before.tasks.dispatchable + 1)
-    expect(after.queue.pending).toBe(before.queue.pending + 1)
-    expect(after.tasks.total).toBe(before.tasks.total + 1)
+      const after = await collectStatus()
+      expect(after.tasks.ratifiedBacklog).toBe(before.tasks.ratifiedBacklog + 1)
+      expect(after.tasks.dispatchable).toBe(before.tasks.dispatchable + 1)
+      expect(after.queue.pending).toBe(before.queue.pending + 1)
+      expect(after.tasks.total).toBe(before.tasks.total + 1)
+    } finally {
+      await deleteTasksAsForces([taskId])
+    }
   })
 
   it('reads daemon liveness from the heartbeat and usage from disk', async () => {
