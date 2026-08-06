@@ -83,8 +83,16 @@ export async function ensureClusterUp(opts: EnsureClusterOptions = {}): Promise<
     }
   }
 
-  const retries = opts.retries ?? 12
-  const backoffMs = opts.backoffMs ?? 500
+  // 90 x 5000ms = 450s (7.5 min) — retry-window audit (BION-CLUSTER-FIX-MERGE-DEPLOY-KOV
+  // directive, 2026-08-06). The old 12 x 500ms = 6s default was tuned back when this function
+  // actively started Postgres itself and just waited out a normal boot. Now it only waits on
+  // postgresql-bion-5433's own Service Recovery, whose worst (3rd-failure) backoff tier is 300s
+  // (install-postgres-service.ps1's `sc.exe failure` config: 60s/120s/300s). 6s gave up roughly
+  // 50x before a slow recovery could ever complete. 450s clears the 300s worst case with 150s
+  // (50%) of real margin — same "real margin, not a hair-trigger" reasoning already applied to
+  // BionHeartbeatCheck's threshold and the service's own Recovery backoff.
+  const retries = opts.retries ?? 90
+  const backoffMs = opts.backoffMs ?? 5000
   for (let i = 0; i < retries; i++) {
     await sleep(backoffMs)
     if (await probe()) return { started: true }
