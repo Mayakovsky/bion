@@ -93,8 +93,8 @@ export async function runDaemon(opts: DaemonOptions = {}): Promise<void> {
       const r = await ensureClusterUp(opts.cluster || {})
       if (r.started) console.log('[daemon] brought up the :5433 cluster')
     } catch (err) {
-      console.error('[daemon] HALT: cluster unavailable and could not be started (non-admin):', (err as Error).message)
-      console.error('[daemon] prerequisite: the user-owned cluster at BION_PGDATA — run scripts/provision-db.sh or scripts/pg-start.sh')
+      console.error('[daemon] HALT: postgresql-bion-5433 service unavailable:', (err as Error).message)
+      console.error('[daemon] check: Get-Service -Name postgresql-bion-5433 (expect Running/Automatic) — the daemon no longer self-starts a bare instance (race-condition fix), Recovery is the service\'s job now')
       throw err
     }
   }
@@ -127,7 +127,8 @@ export async function runDaemon(opts: DaemonOptions = {}): Promise<void> {
       await tick(n, opts)
     } catch (err) {
       console.error('[daemon] tick error:', (err as Error).message)
-      // A tick error is often a cluster that went away mid-run — try to bring it back (best-effort).
+      // A tick error is often the cluster mid-crash-recovery (the service's job, not ours — see
+      // cluster.ts) — just check whether it's back yet, best-effort; the next tick retries either way.
       if (opts.cluster !== false) await ensureClusterUp(opts.cluster || {}).catch(() => {})
     }
     // sleep in short slices so SIGINT stops promptly

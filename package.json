@@ -11,6 +11,7 @@
     "migrate": "tsx src/db/migrate.ts",
     "daemon": "tsx src/daemon/daemon.ts",
     "status": "tsx src/cli/status.ts",
+    "check-heartbeat": "tsx src/cli/checkHeartbeat.ts",
     "cost": "tsx src/cli/cost.ts",
     "task": "tsx src/cli/task.ts",
     "auto-report": "tsx src/cli/autoReport.ts",

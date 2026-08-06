@@ -56,20 +56,31 @@ export interface EnsureClusterOptions {
 }
 
 /**
- * Ensure the cluster is reachable: probe first; if down, start it and re-probe with backoff. A
- * start() error is not fatal on its own (e.g. "already running") — success is decided by the probe.
+ * Ensure the cluster is reachable: probe first; if down, wait with backoff for it to come back.
  * Throws only if the cluster never becomes reachable, which the daemon treats as a HALT.
+ *
+ * Does NOT self-start a bare `pg_ctl` process by default (BION-POSTGRES-SERVICE-REGISTRATION-KOV
+ * race-condition fix, 2026-08-06). Bion's cluster is now a supervised Windows Service
+ * (`postgresql-bion-5433`, Automatic startup + Recovery-on-crash) — a daemon-launched bare
+ * instance would compete with it for port 5433, exactly the race demonstrated during that
+ * directive's own deliberate-kill proof (killing the service's process caused THIS function's old
+ * default to win the race and grab the port before the service's own Recovery could rebind it).
+ * Recovery is the service's job now, not the daemon's; this function only waits for it. Pass an
+ * explicit `start` (e.g. `startCluster`, still exported below) to opt back into self-starting —
+ * useful for local dev without the service installed, never the default for the real daemon.
  */
 export async function ensureClusterUp(opts: EnsureClusterOptions = {}): Promise<{ started: boolean }> {
   const probe = opts.probe ?? (() => canConnect())
-  const start = opts.start ?? startCluster
+  const start = opts.start // no default — see above
   if (await probe()) return { started: false }
 
   let startError: Error | undefined
-  try {
-    start()
-  } catch (err) {
-    startError = err as Error
+  if (start) {
+    try {
+      start()
+    } catch (err) {
+      startError = err as Error
+    }
   }
 
   const retries = opts.retries ?? 12
@@ -79,6 +90,6 @@ export async function ensureClusterUp(opts: EnsureClusterOptions = {}): Promise<
     if (await probe()) return { started: true }
   }
   throw new Error(
-    `cluster did not become reachable after a start attempt${startError ? ` (start error: ${startError.message})` : ''}`,
+    `cluster did not become reachable${start ? ' after a start attempt' : ' (waiting for the postgresql-bion-5433 service, not self-starting)'}${startError ? ` (start error: ${startError.message})` : ''}`,
   )
 }
