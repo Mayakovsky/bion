@@ -44,16 +44,16 @@ function autoScopeFilter(): string | undefined {
   return process.env.BION_AUTO_SCOPE?.trim() || undefined
 }
 
-function scopeEntries(scope: string): string[] {
-  return scope.split(',').map((s) => s.trim()).filter(Boolean)
+function scopePrefixPatterns(scope: string): string[] {
+  return scope.split(',').map((s) => s.trim()).filter(Boolean).map((s) => `${s}%`)
 }
 
 /** Next ratified, dependency-satisfied task across ordered projects (blocked work skipped).
- * When BION_AUTO_SCOPE is set, restricted to task ids matching one of its prefixes/exact ids. */
+ * When BION_AUTO_SCOPE is set, restricted to task ids matching one of its prefixes/exact ids —
+ * exact ids match too, since a bare LIKE pattern's trailing `%` matches zero-or-more chars. */
 export async function selectAutoWork(): Promise<AutoWork | null> {
   const scope = autoScopeFilter()
-  const entries = scope ? scopeEntries(scope) : []
-  const prefixPatterns = entries.map((e) => `${e}%`)
+  const prefixPatterns = scope ? scopePrefixPatterns(scope) : null
   const res = await query<Task & { proj_ord: number }>(
     `SELECT t.id, t.title, t.description, t.owner, t.priority, t.status, t.dependencies,
             t.ratified, t.project, t.created, t.updated,
@@ -67,10 +67,10 @@ export async function selectAutoWork(): Promise<AutoWork | null> {
          LEFT JOIN tasks d ON d.id = dep
          WHERE d.id IS NULL OR d.status <> 'done'
        )
-       AND ($1::text[] IS NULL OR t.id LIKE ANY($1::text[]) OR t.id = ANY($2::text[]))
+       AND ($1::text[] IS NULL OR t.id LIKE ANY($1::text[]))
      ORDER BY proj_ord, t.priority DESC, t.created
      LIMIT 1`,
-    [scope ? prefixPatterns : null, scope ? entries : null],
+    [prefixPatterns],
   )
   const row = res.rows[0]
   if (!row) return null
