@@ -14,19 +14,21 @@ const REVENUE_TABLES = [
 // Plane-boundary is a credential boundary (spec §3.1). These assertions prove the runtime
 // role resolves ONLY to the local, isolated bion DB with no path to the revenue plane.
 describe('plane isolation', () => {
-  it('BION_DATABASE_URL points only at the local bion DB as bion_rw', () => {
+  // Under `vitest run` this resolves to bion_test, not bion (directive-23 Part A test isolation)
+  // — same cluster/port/role, isolated database.
+  it('BION_DATABASE_URL points only at the local bion(_test) DB as bion_rw', () => {
     const u = parseDbUrl(env.databaseUrl)
     expect(['localhost', '127.0.0.1']).toContain(u.host)
     expect(u.port).toBe('5433')
-    expect(u.database).toBe('bion')
+    expect(u.database).toBe('bion_test')
     expect(u.user).toBe('bion_rw')
   })
 
-  it('connects to database "bion" as a non-superuser', async () => {
+  it('connects to database "bion_test" as a non-superuser', async () => {
     const res = await query<{ db: string; su: string }>(
       `SELECT current_database() AS db, current_setting('is_superuser') AS su`,
     )
-    expect(res.rows[0]!.db).toBe('bion')
+    expect(res.rows[0]!.db).toBe('bion_test')
     expect(res.rows[0]!.su).toBe('off')
   })
 

@@ -72,6 +72,64 @@ describe('Auto Mode default posture (directive-20: off -> shadow)', () => {
   })
 })
 
+describe('BION_AUTO_SCOPE task-scope filter (directive-23 Part B)', () => {
+  it('unset: selects the front task exactly as today, unfiltered', async () => {
+    const had = 'BION_AUTO_SCOPE' in process.env
+    const prior = process.env.BION_AUTO_SCOPE
+    delete process.env.BION_AUTO_SCOPE
+    const task = await ratifiedTaskInTopProject()
+    try {
+      const pick = await selectAutoWork()
+      expect(pick).not.toBeNull()
+      expect(pick!.task.id).toBe(task.id)
+    } finally {
+      if (had) process.env.BION_AUTO_SCOPE = prior
+      await cleanupRatifiedTask(task)
+    }
+  })
+
+  it('set to a prefix matching nothing: returns null even though other ratified/ready tasks exist', async () => {
+    const had = 'BION_AUTO_SCOPE' in process.env
+    const prior = process.env.BION_AUTO_SCOPE
+    const task = await ratifiedTaskInTopProject() // exists, ratified, ready — but not e3-*
+    try {
+      process.env.BION_AUTO_SCOPE = 'e3-'
+      const pick = await selectAutoWork()
+      expect(pick).toBeNull()
+    } finally {
+      if (had) process.env.BION_AUTO_SCOPE = prior
+      else delete process.env.BION_AUTO_SCOPE
+      await cleanupRatifiedTask(task)
+    }
+  })
+
+  it('set to a matching prefix: selects the in-scope task even though an out-of-scope task ranks first', async () => {
+    const had = 'BION_AUTO_SCOPE' in process.env
+    const prior = process.env.BION_AUTO_SCOPE
+    // outOfScope sorts FIRST (top ordinal) so, unfiltered, it's the one selectAutoWork() would pick —
+    // proving the scope filter actively excludes it, not that inScope merely happened to rank higher.
+    const outOfScope = await ratifiedTaskInTopProject()
+    const inScopeProj = `proj-${randomUUID()}`
+    const inScopeId = `e3-${randomUUID()}`
+    try {
+      await seedProject(inScopeProj, 2147483646) // last-ranked, ordinally after everything
+      await createTask({ id: inScopeId, title: 'e3 work', project: inScopeProj, priority: 10 })
+      await ratifyAsForces(inScopeId)
+
+      process.env.BION_AUTO_SCOPE = 'e3-'
+      const pick = await selectAutoWork()
+      expect(pick).not.toBeNull()
+      expect(pick!.task.id).toBe(inScopeId)
+    } finally {
+      if (had) process.env.BION_AUTO_SCOPE = prior
+      else delete process.env.BION_AUTO_SCOPE
+      await deleteTasksAsForces([inScopeId])
+      await deleteProjectAsForces(inScopeProj)
+      await cleanupRatifiedTask(outOfScope)
+    }
+  })
+})
+
 describe('Auto Mode — ordered projects, pivot-on-block, shadow-gated (E3)', () => {
   it('pivot-on-block: skips a blocked earlier-project task and advances to the next', async () => {
     const base = await minOrdinal()
