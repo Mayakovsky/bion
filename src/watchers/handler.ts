@@ -19,8 +19,16 @@ export async function handleTestSignal(signal: TestSignal, deps: ReactiveDeps): 
   const { deduped } = await recordEvent({
     kind: signal.passed ? 'test.passed' : 'test.failed',
     source: 'watcher:test',
-    payload: { branch: signal.branch, failed: signal.failed, total: signal.total, failedTests: signal.failedTests, runId: signal.runId },
-    dedupKey: `test:${signal.branch}:${signal.runId}`,
+    payload: {
+      repo: signal.repo,
+      branch: signal.branch,
+      failed: signal.failed,
+      total: signal.total,
+      failedTests: signal.failedTests,
+      runId: signal.runId,
+    },
+    // Namespaced by repo, same reasoning as handleGitSignal (directive-27).
+    dedupKey: `test:${signal.repo}:${signal.branch}:${signal.runId}`,
   })
 
   if (deduped) return { duplicate: true, passed: signal.passed, mode, dispatched: false }

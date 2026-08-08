@@ -6,6 +6,9 @@ import { reactiveMode } from '../loop/reactive.js'
 import { autoModeSetting } from '../auto/autoMode.js'
 import { closePool } from '../db/pool.js'
 import { pollGit, createGitPollState, type RepoRef } from '../watchers/gitWatcher.js'
+import { pollTests, createTestPollState } from '../watchers/testWatcher.js'
+import { KovAdapter } from '../adapters/kov.js'
+import type { ReactiveDeps } from '../loop/reactive.js'
 import { ensureClusterUp, type EnsureClusterOptions } from './cluster.js'
 import { acquireLock, releaseLock, pidfilePath } from './lock.js'
 import { heartbeatPath, writeHeartbeat, type Heartbeat } from './heartbeat.js'
@@ -25,6 +28,12 @@ export interface DaemonOptions {
   reconcileOnStart?: boolean
   /** Poll git HEAD each tick and emit a commit signal (live watcher). Default true. */
   watchGit?: boolean
+  /** Poll for vitest JSON result files each tick and emit a test signal (live watcher,
+   *  directive-27 Task 2). Default true. */
+  watchTests?: boolean
+  /** Reactive-engine deps for the test watcher (kov adapter, mailRoot, notify override) —
+   *  tests isolate this; real runs fall back to a real KovAdapter + real notify. */
+  reactiveDeps?: Partial<ReactiveDeps>
   /** Ensure the :5433 cluster is up on start / after a tick error. false disables (tests). */
   cluster?: EnsureClusterOptions | false
   /** Single-instance pidfile path override (tests isolate this). */
@@ -37,6 +46,7 @@ export interface DaemonOptions {
 // repo; gitPollState avoids a DB round-trip every tick. Multi-repo (directive-27): bion always,
 // plus grey when GREY_REPO_PATH is set — unset stays today's bion-only behavior, unchanged.
 const gitPollState = createGitPollState()
+const testPollState = createTestPollState()
 function watchedRepos(): RepoRef[] {
   const repos: RepoRef[] = [{ name: 'bion', path: process.cwd() }]
   if (env.greyRepoPath) repos.push({ name: 'grey', path: env.greyRepoPath })
@@ -47,6 +57,10 @@ function watchedRepos(): RepoRef[] {
 export async function tick(n: number, opts: DaemonOptions = {}): Promise<Heartbeat> {
   await drainOutbox() // pending publishes/notifies; safe no-op when the queue is empty
   if (opts.watchGit ?? true) await pollGit(watchedRepos(), gitPollState)
+  if (opts.watchTests ?? true) {
+    const deps: ReactiveDeps = { kov: new KovAdapter({ mailRoot: opts.reactiveDeps?.mailRoot }), ...opts.reactiveDeps }
+    await pollTests(watchedRepos(), testPollState, deps)
+  }
   if (opts.onTick) await opts.onTick(n)
   const hb: Heartbeat = {
     pid: process.pid,

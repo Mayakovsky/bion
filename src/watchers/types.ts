@@ -1,8 +1,10 @@
-// Normalized signals emitted by watchers. GitSignal is multi-repo (directive-27); TestSignal is
-// still bion-only pending directive-27 Task 2.
+// Normalized signals emitted by watchers. Both signal kinds are multi-repo (directive-27).
 
 export interface TestSignal {
   kind: 'test'
+  /** Short label for the watched repo (e.g. 'bion', 'grey') — never a filesystem path. Required,
+   *  same posture as GitSignal.repo (directive-27). */
+  repo: string
   branch: string
   passed: boolean
   failed: number
