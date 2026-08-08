@@ -5,11 +5,11 @@ import { recordEvent } from '../core/events.js'
 import { reactiveMode } from '../loop/reactive.js'
 import { autoModeSetting } from '../auto/autoMode.js'
 import { closePool } from '../db/pool.js'
-import { readGitHead, commitSignal } from '../watchers/gitWatcher.js'
-import { handleGitSignal } from '../watchers/handler.js'
+import { pollGit, createGitPollState, type RepoRef } from '../watchers/gitWatcher.js'
 import { ensureClusterUp, type EnsureClusterOptions } from './cluster.js'
 import { acquireLock, releaseLock, pidfilePath } from './lock.js'
 import { heartbeatPath, writeHeartbeat, type Heartbeat } from './heartbeat.js'
+import { env } from '../env.js'
 
 // Persistent daemon (Phase E1) — makes Bion a live process so the outbox, watchers, and (later)
 // the Auto Mode loop actually run. Local-while-machine-is-up is the accepted posture (B9); the
@@ -33,25 +33,20 @@ export interface DaemonOptions {
   onTick?: (tick: number) => Promise<void>
 }
 
-// Live git watcher: emit a commit signal when HEAD moves. Idempotent by sha; lastSha avoids a
-// DB round-trip every tick.
-let lastSha: string | null = null
-async function pollGit(cwd: string): Promise<void> {
-  try {
-    const { branch, sha } = readGitHead(cwd)
-    if (sha !== lastSha) {
-      await handleGitSignal(commitSignal(branch, sha))
-      lastSha = sha
-    }
-  } catch {
-    /* not a git repo / git unavailable — skip */
-  }
+// Live git watcher: emit a commit signal when a watched repo's HEAD moves. Idempotent by sha per
+// repo; gitPollState avoids a DB round-trip every tick. Multi-repo (directive-27): bion always,
+// plus grey when GREY_REPO_PATH is set — unset stays today's bion-only behavior, unchanged.
+const gitPollState = createGitPollState()
+function watchedRepos(): RepoRef[] {
+  const repos: RepoRef[] = [{ name: 'bion', path: process.cwd() }]
+  if (env.greyRepoPath) repos.push({ name: 'grey', path: env.greyRepoPath })
+  return repos
 }
 
 /** One daemon iteration: drain durable intents, poll watchers, run the tick hook, heartbeat. */
 export async function tick(n: number, opts: DaemonOptions = {}): Promise<Heartbeat> {
   await drainOutbox() // pending publishes/notifies; safe no-op when the queue is empty
-  if (opts.watchGit ?? true) await pollGit(process.cwd())
+  if (opts.watchGit ?? true) await pollGit(watchedRepos(), gitPollState)
   if (opts.onTick) await opts.onTick(n)
   const hb: Heartbeat = {
     pid: process.pid,

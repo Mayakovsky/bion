@@ -47,4 +47,8 @@ export const env = {
   },
   ntfyUrl: process.env.BION_NTFY_URL ?? '',
   ntfyToken: process.env.BION_NTFY_TOKEN ?? '',
+  /** Absolute path to the grey repo root, e.g. C:\Users\kidco\dev\grey. Unset = today's
+   *  bion-only watcher behavior, unchanged (directive-27 "safe by default", same posture as
+   *  BION_AUTO_MODE/BION_REACTIVE_DISPATCH). */
+  greyRepoPath: process.env.GREY_REPO_PATH || undefined,
 }

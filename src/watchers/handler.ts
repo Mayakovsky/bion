@@ -34,8 +34,11 @@ export async function handleGitSignal(signal: GitSignal): Promise<{ duplicate: b
   const { event, deduped } = await recordEvent({
     kind: signal.event === 'commit' ? 'git.commit' : 'git.branch',
     source: 'watcher:git',
-    payload: { branch: signal.branch, sha: signal.sha },
-    dedupKey: `git:${signal.event}:${signal.sha}`,
+    payload: { repo: signal.repo, branch: signal.branch, sha: signal.sha },
+    // Namespaced by repo (directive-27): shas are already effectively unique across independent
+    // repos, so this isn't fixing a real collision — it removes even the theoretical case and
+    // makes the events table self-describing without a join back to a repo-path config.
+    dedupKey: `git:${signal.event}:${signal.repo}:${signal.sha}`,
   })
 
   // directive-18 addendum: a commit is the closest thing Bion already observes to "Kov just did

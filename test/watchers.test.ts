@@ -51,11 +51,11 @@ describe('test-output watcher parses vitest JSON', () => {
 describe('git watcher emits idempotent events', () => {
   it('collapses a duplicate commit signal (dedup by sha)', async () => {
     const sha = `sha-${randomUUID()}`
-    expect((await handleGitSignal(commitSignal('main', sha))).duplicate).toBe(false)
-    expect((await handleGitSignal(commitSignal('main', sha))).duplicate).toBe(true)
+    expect((await handleGitSignal(commitSignal('bion', 'main', sha))).duplicate).toBe(false)
+    expect((await handleGitSignal(commitSignal('bion', 'main', sha))).duplicate).toBe(true)
     const ev = await query<{ n: string }>(
       `SELECT count(*)::text AS n FROM events WHERE kind = 'git.commit' AND dedup_key = $1`,
-      [`git:commit:${sha}`],
+      [`git:commit:bion:${sha}`],
     )
     expect(ev.rows[0]!.n).toBe('1')
   })
