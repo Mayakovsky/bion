@@ -1,5 +1,6 @@
 import { config } from 'dotenv'
-import { repoPath } from './paths.js'
+import { dirname } from 'node:path'
+import { repoPath, repoRoot } from './paths.js'
 
 /** Absolute path to .env.local, resolved relative to the repo root (NOT process.cwd()). */
 export function resolveEnvPath(): string {
@@ -47,8 +48,11 @@ export const env = {
   },
   ntfyUrl: process.env.BION_NTFY_URL ?? '',
   ntfyToken: process.env.BION_NTFY_TOKEN ?? '',
-  /** Absolute path to the grey repo root, e.g. C:\Users\kidco\dev\grey. Unset = today's
-   *  bion-only watcher behavior, unchanged (directive-27 "safe by default", same posture as
-   *  BION_AUTO_MODE/BION_REACTIVE_DISPATCH). */
-  greyRepoPath: process.env.GREY_REPO_PATH || undefined,
+  /** Absolute path to the /dev root Bion auto-discovers watched repos under (directive-68,
+   *  replaces GREY_REPO_PATH). Default is derived, not hardcoded: repoRoot() is `.../dev/bion/repo`,
+   *  so two levels up is `.../dev` — safe-by-default, overridable via BION_DEV_ROOT for tests or a
+   *  differently-laid-out machine. */
+  get devRoot(): string {
+    return process.env.BION_DEV_ROOT || dirname(dirname(repoRoot()))
+  },
 }

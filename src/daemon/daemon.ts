@@ -7,6 +7,7 @@ import { autoModeSetting } from '../auto/autoMode.js'
 import { closePool } from '../db/pool.js'
 import { pollGit, createGitPollState, type RepoRef } from '../watchers/gitWatcher.js'
 import { pollTests, createTestPollState } from '../watchers/testWatcher.js'
+import { discoverRepos } from '../watchers/discovery.js'
 import { KovAdapter } from '../adapters/kov.js'
 import type { ReactiveDeps } from '../loop/reactive.js'
 import { ensureClusterUp, type EnsureClusterOptions } from './cluster.js'
@@ -43,14 +44,13 @@ export interface DaemonOptions {
 }
 
 // Live git watcher: emit a commit signal when a watched repo's HEAD moves. Idempotent by sha per
-// repo; gitPollState avoids a DB round-trip every tick. Multi-repo (directive-27): bion always,
-// plus grey when GREY_REPO_PATH is set — unset stays today's bion-only behavior, unchanged.
+// repo; gitPollState avoids a DB round-trip every tick. Dev-root-wide auto-discovery (directive-68,
+// replaces directive-27's bion+GREY_REPO_PATH static list): every repo discoverRepos() finds under
+// env.devRoot, re-discovered each tick so a repo added mid-run is picked up without a restart.
 const gitPollState = createGitPollState()
 const testPollState = createTestPollState()
 function watchedRepos(): RepoRef[] {
-  const repos: RepoRef[] = [{ name: 'bion', path: process.cwd() }]
-  if (env.greyRepoPath) repos.push({ name: 'grey', path: env.greyRepoPath })
-  return repos
+  return discoverRepos(env.devRoot)
 }
 
 /** One daemon iteration: drain durable intents, poll watchers, run the tick hook, heartbeat. */
