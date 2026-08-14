@@ -36,20 +36,19 @@ function isIgnored(name: string, patterns: string[]): boolean {
   return patterns.some((p) => patternToRegex(p).test(name))
 }
 
-/** Find a `.git` at `dir` itself, or exactly one level below it (bion's `repo/` nesting shape).
- *  Returns the directory that actually holds `.git`, or null if neither has one. */
-function findGitRoot(dir: string): string | null {
-  if (existsSync(join(dir, '.git'))) return dir
+/** Every immediate subdirectory of `dir` that itself has a `.git`, sorted alphabetically by
+ *  directory name — deterministic, not dependent on `readdirSync`'s own (unordered) return order. */
+function findNestedGitDirs(dir: string): string[] {
   let entries: import('node:fs').Dirent[]
   try {
     entries = readdirSync(dir, { withFileTypes: true })
   } catch {
-    return null // unreadable — not a repo we can watch
+    return [] // unreadable — not a repo we can watch
   }
-  for (const entry of entries) {
-    if (entry.isDirectory() && existsSync(join(dir, entry.name, '.git'))) return join(dir, entry.name)
-  }
-  return null
+  return entries
+    .filter((entry) => entry.isDirectory() && existsSync(join(dir, entry.name, '.git')))
+    .map((entry) => entry.name)
+    .sort()
 }
 
 export interface DiscoveryOptions {
@@ -58,9 +57,22 @@ export interface DiscoveryOptions {
 }
 
 /**
- * List every repo under `devRoot`: each top-level directory with a `.git` at itself or one level
- * below, minus anything `.bion/bionignore` excludes. Re-run each tick (daemon.ts) so a repo added
- * mid-run is picked up without a restart — this function does no caching of its own.
+ * List every repo under `devRoot`. For each top-level directory:
+ *  - a `.git` at its own root → one `RepoRef` named after the top-level directory.
+ *  - no `.git` at its root, exactly one nested `.git` one level below → one `RepoRef`, still named
+ *    after the top-level directory (bion's `repo/` nesting shape — unchanged from before this
+ *    addendum, since real `git.commit` events already exist under dedup keys built from that name).
+ *  - no `.git` at its root, MORE THAN ONE nested `.git` one level below (directive-68 addendum —
+ *    `eliza`'s shape) → one `RepoRef` per nested repo, named `<top>/<nested>`, sorted alphabetically
+ *    so the set is deterministic across runs/environments instead of picking whichever one
+ *    `readdirSync` happened to return first.
+ * `.bion/bionignore` excludes by matching either a top-level directory's own name (drops the whole
+ * directory, including every nested repo under it) or, for the multi-nested case, a nested
+ * directory's own bare name (drops just that one sibling) — NOT a compound `top/nested` pattern,
+ * a deliberate choice to keep the matcher single-purpose; a bare nested name matches under any
+ * top-level parent it appears under.
+ * Re-run each tick (daemon.ts) so a repo added mid-run is picked up without a restart — this
+ * function does no caching of its own.
  */
 export function discoverRepos(devRoot: string, opts: DiscoveryOptions = {}): RepoRef[] {
   const patterns = loadIgnorePatterns(opts.ignorePath ?? defaultIgnorePath())
@@ -73,8 +85,21 @@ export function discoverRepos(devRoot: string, opts: DiscoveryOptions = {}): Rep
   const repos: RepoRef[] = []
   for (const entry of entries) {
     if (!entry.isDirectory() || isIgnored(entry.name, patterns)) continue
-    const gitRoot = findGitRoot(join(devRoot, entry.name))
-    if (gitRoot) repos.push({ name: entry.name, path: gitRoot })
+    const topDir = join(devRoot, entry.name)
+    if (existsSync(join(topDir, '.git'))) {
+      repos.push({ name: entry.name, path: topDir })
+      continue
+    }
+    const nested = findNestedGitDirs(topDir)
+    if (nested.length === 0) continue
+    if (nested.length === 1) {
+      repos.push({ name: entry.name, path: join(topDir, nested[0]!) })
+      continue
+    }
+    for (const nestedName of nested) {
+      if (isIgnored(nestedName, patterns)) continue
+      repos.push({ name: `${entry.name}/${nestedName}`, path: join(topDir, nestedName) })
+    }
   }
   return repos
 }

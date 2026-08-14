@@ -36,6 +36,49 @@ describe('discoverRepos — flat and nested shapes', () => {
   })
 })
 
+describe('discoverRepos — multi-nested-repo shape (directive-68 addendum, eliza-shaped)', () => {
+  it('a single nested repo keeps the top-level-name convention unchanged (bion regression)', () => {
+    const devRoot = freshDevRoot()
+    makeNestedRepo(devRoot, 'bion')
+
+    const repos = discoverRepos(devRoot, { ignorePath: join(devRoot, 'no-such-ignore-file') })
+    expect(repos).toHaveLength(1)
+    expect(repos[0]).toEqual({ name: 'bion', path: join(devRoot, 'bion', 'repo') })
+  })
+
+  it('multiple nested repos are each emitted, compound-named, deterministic across repeated calls', () => {
+    const devRoot = freshDevRoot()
+    const nestedNames = ['plugin-acp', 'plugin-autognostic', 'plugin-wpv', 'wpv-agent', 'wpv-mailer', '_archived_autognostic-agent']
+    for (const n of nestedNames) makeNestedRepo(devRoot, 'eliza', n)
+    const opts = { ignorePath: join(devRoot, 'no-such-ignore-file') }
+
+    const first = discoverRepos(devRoot, opts)
+    const elizaRepos = first.filter((r) => r.name.startsWith('eliza/'))
+    expect(elizaRepos.map((r) => r.name)).toEqual(
+      ['_archived_autognostic-agent', 'plugin-acp', 'plugin-autognostic', 'plugin-wpv', 'wpv-agent', 'wpv-mailer'].map(
+        (n) => `eliza/${n}`,
+      ),
+    )
+    for (const r of elizaRepos) expect(r.path).toBe(join(devRoot, 'eliza', r.name.split('/')[1]!))
+
+    const second = discoverRepos(devRoot, opts)
+    expect(second.filter((r) => r.name.startsWith('eliza/')).map((r) => r.name)).toEqual(elizaRepos.map((r) => r.name))
+  })
+
+  it('bionignore excludes one nested sibling by bare name, leaving the others watched', () => {
+    const devRoot = freshDevRoot()
+    makeNestedRepo(devRoot, 'eliza', 'plugin-acp')
+    makeNestedRepo(devRoot, 'eliza', '_archived_autognostic-agent')
+    const ignorePath = join(devRoot, '.bion', 'bionignore')
+    mkdirSync(join(devRoot, '.bion'), { recursive: true })
+    writeFileSync(ignorePath, '_archived_autognostic-agent\n')
+
+    const repos = discoverRepos(devRoot, { ignorePath })
+    expect(repos.find((r) => r.name === 'eliza/_archived_autognostic-agent')).toBeUndefined()
+    expect(repos.find((r) => r.name === 'eliza/plugin-acp')).toBeTruthy()
+  })
+})
+
 describe('discoverRepos — non-repo directories', () => {
   it('skips a directory with no .git at itself or one level below', () => {
     const devRoot = freshDevRoot()
