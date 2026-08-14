@@ -5,11 +5,15 @@ import { recordEvent } from '../core/events.js'
 import { reactiveMode } from '../loop/reactive.js'
 import { autoModeSetting } from '../auto/autoMode.js'
 import { closePool } from '../db/pool.js'
-import { readGitHead, commitSignal } from '../watchers/gitWatcher.js'
-import { handleGitSignal } from '../watchers/handler.js'
+import { pollGit, createGitPollState, type RepoRef } from '../watchers/gitWatcher.js'
+import { pollTests, createTestPollState } from '../watchers/testWatcher.js'
+import { discoverRepos } from '../watchers/discovery.js'
+import { KovAdapter } from '../adapters/kov.js'
+import type { ReactiveDeps } from '../loop/reactive.js'
 import { ensureClusterUp, type EnsureClusterOptions } from './cluster.js'
 import { acquireLock, releaseLock, pidfilePath } from './lock.js'
 import { heartbeatPath, writeHeartbeat, type Heartbeat } from './heartbeat.js'
+import { env } from '../env.js'
 
 // Persistent daemon (Phase E1) — makes Bion a live process so the outbox, watchers, and (later)
 // the Auto Mode loop actually run. Local-while-machine-is-up is the accepted posture (B9); the
@@ -25,6 +29,12 @@ export interface DaemonOptions {
   reconcileOnStart?: boolean
   /** Poll git HEAD each tick and emit a commit signal (live watcher). Default true. */
   watchGit?: boolean
+  /** Poll for vitest JSON result files each tick and emit a test signal (live watcher,
+   *  directive-27 Task 2). Default true. */
+  watchTests?: boolean
+  /** Reactive-engine deps for the test watcher (kov adapter, mailRoot, notify override) —
+   *  tests isolate this; real runs fall back to a real KovAdapter + real notify. */
+  reactiveDeps?: Partial<ReactiveDeps>
   /** Ensure the :5433 cluster is up on start / after a tick error. false disables (tests). */
   cluster?: EnsureClusterOptions | false
   /** Single-instance pidfile path override (tests isolate this). */
@@ -33,25 +43,24 @@ export interface DaemonOptions {
   onTick?: (tick: number) => Promise<void>
 }
 
-// Live git watcher: emit a commit signal when HEAD moves. Idempotent by sha; lastSha avoids a
-// DB round-trip every tick.
-let lastSha: string | null = null
-async function pollGit(cwd: string): Promise<void> {
-  try {
-    const { branch, sha } = readGitHead(cwd)
-    if (sha !== lastSha) {
-      await handleGitSignal(commitSignal(branch, sha))
-      lastSha = sha
-    }
-  } catch {
-    /* not a git repo / git unavailable — skip */
-  }
+// Live git watcher: emit a commit signal when a watched repo's HEAD moves. Idempotent by sha per
+// repo; gitPollState avoids a DB round-trip every tick. Dev-root-wide auto-discovery (directive-68,
+// replaces directive-27's bion+GREY_REPO_PATH static list): every repo discoverRepos() finds under
+// env.devRoot, re-discovered each tick so a repo added mid-run is picked up without a restart.
+const gitPollState = createGitPollState()
+const testPollState = createTestPollState()
+function watchedRepos(): RepoRef[] {
+  return discoverRepos(env.devRoot)
 }
 
 /** One daemon iteration: drain durable intents, poll watchers, run the tick hook, heartbeat. */
 export async function tick(n: number, opts: DaemonOptions = {}): Promise<Heartbeat> {
   await drainOutbox() // pending publishes/notifies; safe no-op when the queue is empty
-  if (opts.watchGit ?? true) await pollGit(process.cwd())
+  if (opts.watchGit ?? true) await pollGit(watchedRepos(), gitPollState)
+  if (opts.watchTests ?? true) {
+    const deps: ReactiveDeps = { kov: new KovAdapter({ mailRoot: opts.reactiveDeps?.mailRoot }), ...opts.reactiveDeps }
+    await pollTests(watchedRepos(), testPollState, deps)
+  }
   if (opts.onTick) await opts.onTick(n)
   const hb: Heartbeat = {
     pid: process.pid,

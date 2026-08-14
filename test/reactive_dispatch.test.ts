@@ -30,6 +30,7 @@ async function ratifiedBranch(): Promise<{ taskId: string; branch: string }> {
 
 const failSig = (branch: string, runId: string) => ({
   kind: 'test' as const,
+  repo: 'bion',
   branch,
   passed: false,
   failed: 1,

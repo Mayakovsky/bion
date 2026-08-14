@@ -42,7 +42,7 @@ describe('git commit signal triggers the kov cost collector (directive-18 addend
     const reqId = `req-${randomUUID()}`
     writeFileSync(join(projDir, `${randomUUID()}.jsonl`), usageLine(reqId) + '\n')
 
-    await withProjectsRoot(root, () => handleGitSignal(commitSignal('main', `sha-${randomUUID()}`)))
+    await withProjectsRoot(root, () => handleGitSignal(commitSignal('bion', 'main', `sha-${randomUUID()}`)))
 
     const rows = await query<{ n: string }>(`SELECT count(*)::text AS n FROM events WHERE dedup_key = $1`, [
       `cost.kov:${reqId}`,
@@ -53,9 +53,9 @@ describe('git commit signal triggers the kov cost collector (directive-18 addend
   it('a duplicate commit signal is a no-op (skips the scan, still doesn\'t throw)', async () => {
     const sha = `sha-${randomUUID()}`
     await withProjectsRoot(join(tmpdir(), `bion-kov-cost-missing-${randomUUID()}`), async () => {
-      const first = await handleGitSignal(commitSignal('main', sha))
+      const first = await handleGitSignal(commitSignal('bion', 'main', sha))
       expect(first.duplicate).toBe(false)
-      const second = await handleGitSignal(commitSignal('main', sha))
+      const second = await handleGitSignal(commitSignal('bion', 'main', sha))
       expect(second.duplicate).toBe(true)
     })
   })
@@ -67,7 +67,7 @@ describe('git commit signal triggers the kov cost collector (directive-18 addend
     const reqId = `req-${randomUUID()}`
     writeFileSync(join(projDir, `${randomUUID()}.jsonl`), usageLine(reqId) + '\n')
 
-    await withProjectsRoot(root, () => handleGitSignal(branchSignal('main', `sha-${randomUUID()}`)))
+    await withProjectsRoot(root, () => handleGitSignal(branchSignal('bion', 'main', `sha-${randomUUID()}`)))
 
     const rows = await query<{ n: string }>(`SELECT count(*)::text AS n FROM events WHERE dedup_key = $1`, [
       `cost.kov:${reqId}`,
@@ -84,7 +84,7 @@ describe('git commit signal triggers the kov cost collector (directive-18 addend
 
     await withProjectsRoot(notADir, async () => {
       const sha = `sha-${randomUUID()}`
-      await expect(handleGitSignal(commitSignal('main', sha))).resolves.toMatchObject({ duplicate: false })
+      await expect(handleGitSignal(commitSignal('bion', 'main', sha))).resolves.toMatchObject({ duplicate: false })
     })
   })
 })

@@ -33,7 +33,7 @@ describe('test-output watcher parses vitest JSON', () => {
           ] },
         ],
       },
-      { branch: 'bion/x', runId: 'r1' },
+      { repo: 'bion', branch: 'bion/x', runId: 'r1' },
     )
     expect(sig.passed).toBe(false)
     expect(sig.failed).toBe(1)
@@ -42,7 +42,7 @@ describe('test-output watcher parses vitest JSON', () => {
   })
 
   it('marks a clean run as passed', () => {
-    const sig = parseVitestJson({ numTotalTests: 2, numFailedTests: 0 }, { branch: 'b', runId: 'r2' })
+    const sig = parseVitestJson({ numTotalTests: 2, numFailedTests: 0 }, { repo: 'bion', branch: 'b', runId: 'r2' })
     expect(sig.passed).toBe(true)
     expect(sig.failedTests).toEqual([])
   })
@@ -51,11 +51,11 @@ describe('test-output watcher parses vitest JSON', () => {
 describe('git watcher emits idempotent events', () => {
   it('collapses a duplicate commit signal (dedup by sha)', async () => {
     const sha = `sha-${randomUUID()}`
-    expect((await handleGitSignal(commitSignal('main', sha))).duplicate).toBe(false)
-    expect((await handleGitSignal(commitSignal('main', sha))).duplicate).toBe(true)
+    expect((await handleGitSignal(commitSignal('bion', 'main', sha))).duplicate).toBe(false)
+    expect((await handleGitSignal(commitSignal('bion', 'main', sha))).duplicate).toBe(true)
     const ev = await query<{ n: string }>(
       `SELECT count(*)::text AS n FROM events WHERE kind = 'git.commit' AND dedup_key = $1`,
-      [`git:commit:${sha}`],
+      [`git:commit:bion:${sha}`],
     )
     expect(ev.rows[0]!.n).toBe('1')
   })
@@ -71,7 +71,7 @@ describe('reactive mode = off (default live behavior)', () => {
     const { calls, notify } = capture()
     const runId = randomUUID()
     const branch = `bion/none-${randomUUID()}`
-    const sig = { kind: 'test' as const, branch, passed: false, failed: 1, total: 3, failedTests: ['a > b'], runId }
+    const sig = { kind: 'test' as const, repo: 'bion', branch, passed: false, failed: 1, total: 3, failedTests: ['a > b'], runId }
 
     const r = await handleTestSignal(sig, { kov, mailRoot: root, notify, mode: 'off' })
     expect(r.duplicate).toBe(false)
@@ -91,7 +91,7 @@ describe('reactive mode = off (default live behavior)', () => {
 
     // a passing run does nothing
     const pass = await handleTestSignal(
-      { kind: 'test', branch, passed: true, failed: 0, total: 3, failedTests: [], runId: randomUUID() },
+      { kind: 'test', repo: 'bion', branch, passed: true, failed: 0, total: 3, failedTests: [], runId: randomUUID() },
       { kov, mailRoot: root, notify, mode: 'off' },
     )
     expect(pass.dispatched).toBe(false)
