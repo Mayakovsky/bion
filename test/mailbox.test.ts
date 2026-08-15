@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { writePacket, listBox, movePacket, mailboxRoot } from '../src/index.js'
+import { writePacket, listBox, movePacket, mailboxRoot, repoPath } from '../src/index.js'
 import { sha256 } from '../src/index.js'
 
 function freshRoot(): string {
@@ -43,5 +43,13 @@ describe('mailbox atomic write (Gate B: no partial reads)', () => {
     expect(existsSync(path)).toBe(false)
     expect(dest.replace(/\\/g, '/')).toContain('/kov/read/')
     expect(listBox('kov', 'unread', root)).toEqual([])
+  })
+
+  it('an empty-string root (BaseAdapter\'s unset default) falls through to the real default, not a bare relative path', () => {
+    // directive-71 Task 3 finding: mailboxRoot('') used to return '' literally (?? doesn't treat
+    // '' as unset), so a bare `new KovAdapter()`/`new DesktopAdapter()` landed packets in
+    // ./<recipient>/unread relative to cwd instead of .bion/mail/<recipient>/unread.
+    expect(mailboxRoot('')).toBe(mailboxRoot(undefined))
+    expect(mailboxRoot('')).toBe(repoPath('.bion', 'mail'))
   })
 })

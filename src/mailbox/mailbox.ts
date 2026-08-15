@@ -10,7 +10,11 @@ import { repoPath } from '../paths.js'
 export type Box = 'unread' | 'read' | 'flagged'
 
 export function mailboxRoot(root?: string): string {
-  return root ?? process.env.BION_MAIL_ROOT ?? repoPath('.bion', 'mail')
+  // `||`, not `??`: BaseAdapter defaults its unset mailRoot to '' (the field is typed non-optional
+  // string), and listBox()/boxDir() coerce a missing root to '' too — an empty string must fall
+  // through to the real defaults, not be taken as "root is the cwd" (directive-71 Task 3 finding:
+  // this was landing real packets in a bare ./<recipient>/unread/ instead of .bion/mail/…).
+  return root || process.env.BION_MAIL_ROOT || repoPath('.bion', 'mail')
 }
 
 function boxDir(root: string, recipient: string, box: Box): string {
