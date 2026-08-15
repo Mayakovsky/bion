@@ -14,6 +14,7 @@
     "check-heartbeat": "tsx src/cli/checkHeartbeat.ts",
     "cost": "tsx src/cli/cost.ts",
     "task": "tsx src/cli/task.ts",
+    "mail": "tsx src/cli/mail.ts",
     "auto-report": "tsx src/cli/autoReport.ts",
     "test": "vitest run",
     "test:watch": "vitest",
