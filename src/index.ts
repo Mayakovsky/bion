@@ -60,6 +60,7 @@ export { parseTaskArgv, parseCreateArgs, parseListArgs, formatTask, formatTaskLi
 export type { ParsedFlags } from './cli/task.js'
 export { parseMailArgv, parseSendArgs, parsePollArgs, sendMail, pollMail, formatPollResult } from './cli/mail.js'
 export type { ParsedMailArgv, SendArgs, PollArgs } from './cli/mail.js'
+export { createDesktopMailServer } from './mcp/desktopMail.js'
 export { collectAutoReport, formatAutoReport } from './cli/autoReport.js'
 export type { AutoReportData, AutoReportScale, AutoReportOptions, ShadowPick } from './cli/autoReport.js'
 export { tick, runDaemon } from './daemon/daemon.js'
