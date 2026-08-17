@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      # scripts/*.sh (create-project.sh, ratify-*.sh, pg-start/stop.sh, provision*.sh) all default
+      # PGBIN to a hardcoded Windows path, overridable via this var — set it here rather than
+      # touch every script, since this override knob already exists for exactly this purpose.
+      BION_PGBIN: /usr/bin
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install
+
+      - name: Ensure psql is available at BION_PGBIN
+        run: command -v psql || sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      # This repo's own db:provision/db:provision-test scripts assume a persistent, manually
+      # initdb'd local cluster (~/.bion-pg) — not a fit for CI's ephemeral postgres service. This
+      # step is the CI-equivalent: create the same roles the tracked migrations assume exist
+      # (bion_owner/bion_rw per migrations/0002_grants.sql; bion_desktop_ro is never created by a
+      # tracked migration — its own role creation predates that convention, directive-72 — but
+      # 0008/0009 reference it, so it must exist here too), then bion_test + grants, then write
+      # .env.test (gitignored locally, generated fresh here — never the real local secrets).
+      - name: Provision bion_test roles + database
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h 127.0.0.1 -p 5433 -U postgres -c "CREATE ROLE bion_owner LOGIN PASSWORD 'ci_owner_pw';"
+          psql -h 127.0.0.1 -p 5433 -U postgres -c "CREATE ROLE bion_rw LOGIN PASSWORD 'ci_rw_pw';"
+          psql -h 127.0.0.1 -p 5433 -U postgres -c "CREATE ROLE bion_desktop_ro LOGIN PASSWORD 'ci_desktop_ro_pw';"
+          psql -h 127.0.0.1 -p 5433 -U postgres -c "CREATE DATABASE bion_test OWNER bion_owner;"
+          psql -h 127.0.0.1 -p 5433 -U postgres -d bion_test <<'SQL'
+          REVOKE ALL ON DATABASE bion_test FROM PUBLIC;
+          GRANT CONNECT ON DATABASE bion_test TO bion_owner, bion_rw, bion_desktop_ro;
+          ALTER SCHEMA public OWNER TO bion_owner;
+          REVOKE CREATE ON SCHEMA public FROM bion_rw;
+          GRANT USAGE ON SCHEMA public TO bion_rw, bion_desktop_ro;
+          SQL
+          cat > .env.test <<'EOF'
+          BION_DATABASE_URL=postgresql://bion_rw:ci_rw_pw@127.0.0.1:5433/bion_test
+          BION_MIGRATE_URL=postgresql://bion_owner:ci_owner_pw@127.0.0.1:5433/bion_test
+          BION_NTFY_URL=
+          BION_NTFY_TOKEN=
+          EOF
+          # test/env.test.ts exercises the real production concern directive-11 exists for (the
+          # Task-Scheduler-launched daemon must load .env.local regardless of cwd) — it loads this
+          # file into an isolated object, never real process.env, so a non-functioning placeholder
+          # ntfy URL is safe here: nothing in the suite makes a real network call against it.
+          cat > .env.local <<'EOF'
+          BION_DATABASE_URL=postgresql://bion_rw:ci_rw_pw@127.0.0.1:5433/bion_test
+          BION_MIGRATE_URL=postgresql://bion_owner:ci_owner_pw@127.0.0.1:5433/bion_test
+          BION_NTFY_URL=https://ntfy.sh/ci-placeholder-not-real
+          BION_NTFY_TOKEN=
+          EOF
+
+      - run: pnpm typecheck
+
+      - run: pnpm test
