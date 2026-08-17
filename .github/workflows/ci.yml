@@ -74,6 +74,16 @@ jobs:
           BION_NTFY_URL=
           BION_NTFY_TOKEN=
           EOF
+          # test/env.test.ts exercises the real production concern directive-11 exists for (the
+          # Task-Scheduler-launched daemon must load .env.local regardless of cwd) — it loads this
+          # file into an isolated object, never real process.env, so a non-functioning placeholder
+          # ntfy URL is safe here: nothing in the suite makes a real network call against it.
+          cat > .env.local <<'EOF'
+          BION_DATABASE_URL=postgresql://bion_rw:ci_rw_pw@127.0.0.1:5433/bion_test
+          BION_MIGRATE_URL=postgresql://bion_owner:ci_owner_pw@127.0.0.1:5433/bion_test
+          BION_NTFY_URL=https://ntfy.sh/ci-placeholder-not-real
+          BION_NTFY_TOKEN=
+          EOF
 
       - run: pnpm typecheck
 
