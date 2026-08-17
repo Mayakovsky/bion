@@ -9,6 +9,11 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      # scripts/*.sh (create-project.sh, ratify-*.sh, pg-start/stop.sh, provision*.sh) all default
+      # PGBIN to a hardcoded Windows path, overridable via this var — set it here rather than
+      # touch every script, since this override knob already exists for exactly this purpose.
+      BION_PGBIN: /usr/bin
     services:
       postgres:
         image: postgres:16
@@ -37,6 +42,9 @@ jobs:
           cache: pnpm
 
       - run: pnpm install
+
+      - name: Ensure psql is available at BION_PGBIN
+        run: command -v psql || sudo apt-get update && sudo apt-get install -y postgresql-client
 
       # This repo's own db:provision/db:provision-test scripts assume a persistent, manually
       # initdb'd local cluster (~/.bion-pg) — not a fit for CI's ephemeral postgres service. This

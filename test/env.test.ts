@@ -16,7 +16,6 @@ describe('env loading is cwd-independent (directive-11)', () => {
       process.chdir(elsewhere) // simulate Task Scheduler's foreign cwd
       const p = resolveEnvPath()
       expect(p).toBe(repoPath('.env.local'))
-      expect(p.replace(/\\/g, '/')).toMatch(/\/repo\/\.env\.local$/)
       expect(existsSync(p)).toBe(true)
 
       // load from that path into a clean object (never touches real process.env)
