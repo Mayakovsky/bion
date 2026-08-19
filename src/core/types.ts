@@ -24,6 +24,8 @@ export interface Task {
   dependencies: string[]
   ratified: boolean
   project: string | null
+  /** Explicit task↔branch binding (directive-91) — set when real work begins. Nullable. */
+  branch: string | null
   created: Date
   updated: Date
 }

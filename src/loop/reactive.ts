@@ -66,12 +66,25 @@ export interface ReactiveOutcome {
   notified?: NotifyResult
 }
 
-/** A branch `bion/<taskId>` maps to task `<taskId>` (feature-branch convention). */
+/** A branch `bion/<taskId>` maps to task `<taskId>` (feature-branch convention). Fallback only
+ *  (directive-91) — kept exactly as it worked before, for bion's own already-working branches. */
 function taskIdFromBranch(branch: string): string | null {
   return branch.startsWith(FEATURE_PREFIX) ? branch.slice(FEATURE_PREFIX.length) : null
 }
 
+/** Explicit binding first (directive-91) — real lookup by the `branch` column a task was bound
+ *  to via `bindBranch()`, not a guess from the branch string. This is what makes reactive dispatch
+ *  usable on repos like `grey`, whose branches never follow bion's own `bion/<taskId>` naming
+ *  culture. Falls back to the string-match convention only when no explicit binding exists, so
+ *  bion's own existing branches keep working unchanged. */
 async function ratifiedTaskForBranch(branch: string): Promise<Task | null> {
+  const bound = await query<Task>(
+    `SELECT id, title, description, owner, priority, status, dependencies, ratified, project, branch, created, updated
+     FROM tasks WHERE branch = $1 AND ratified = true`,
+    [branch],
+  )
+  if (bound.rows[0]) return bound.rows[0]
+
   const id = taskIdFromBranch(branch)
   if (!id) return null
   const task = await getTask(id)

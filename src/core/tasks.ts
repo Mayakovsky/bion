@@ -37,7 +37,7 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
   const res = await query<Task>(
     `INSERT INTO tasks (id, title, description, owner, priority, status, dependencies, project)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-     RETURNING id, title, description, owner, priority, status, dependencies, ratified, project, created, updated`,
+     RETURNING id, title, description, owner, priority, status, dependencies, ratified, project, branch, created, updated`,
     [
       input.id,
       input.title,
@@ -77,7 +77,7 @@ export async function listTasks(filter: ListTasksFilter = {}, exec: Executor = p
   }
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''
   const res = await exec.query<Task>(
-    `SELECT id, title, description, owner, priority, status, dependencies, ratified, project, created, updated
+    `SELECT id, title, description, owner, priority, status, dependencies, ratified, project, branch, created, updated
      FROM tasks ${where}
      ORDER BY priority DESC, created ASC`,
     params,
@@ -87,7 +87,7 @@ export async function listTasks(filter: ListTasksFilter = {}, exec: Executor = p
 
 export async function getTask(id: string, exec: Executor = pool()): Promise<Task | null> {
   const res = await exec.query<Task>(
-    `SELECT id, title, description, owner, priority, status, dependencies, ratified, project, created, updated
+    `SELECT id, title, description, owner, priority, status, dependencies, ratified, project, branch, created, updated
      FROM tasks WHERE id = $1`,
     [id],
   )
@@ -103,9 +103,31 @@ export async function setTaskStatus(
   const res = await exec.query<Task>(
     `UPDATE tasks SET status = $2, updated = now()
      WHERE id = $1 AND status IS DISTINCT FROM $2
-     RETURNING id, title, description, owner, priority, status, dependencies, ratified, project, created, updated`,
+     RETURNING id, title, description, owner, priority, status, dependencies, ratified, project, branch, created, updated`,
     [id, status],
   )
   if ((res.rowCount ?? 0) > 0) return res.rows[0]!
   return getTask(id, exec)
+}
+
+/**
+ * Explicit task↔branch binding (directive-91) — record real work starting on a ratified task,
+ * so `reactive.ts` can look the task up directly instead of guessing from the branch name.
+ * Only binds a ratified task (mirrors `decide()`'s own "not-ratified-branch" gate in reactive.ts —
+ * binding an unratified task's branch would just create a dead association nothing can dispatch
+ * against). Returns null if the task doesn't exist or isn't ratified; doesn't throw, since a
+ * caller running this as part of a normal "start work" step shouldn't crash on a bad task id.
+ */
+export async function bindBranch(
+  id: string,
+  branch: string,
+  exec: Executor = pool(),
+): Promise<Task | null> {
+  const res = await exec.query<Task>(
+    `UPDATE tasks SET branch = $2, updated = now()
+     WHERE id = $1 AND ratified = true
+     RETURNING id, title, description, owner, priority, status, dependencies, ratified, project, branch, created, updated`,
+    [id, branch],
+  )
+  return res.rows[0] ?? null
 }

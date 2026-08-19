@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
-import { createTask, listTasks, type CreateTaskInput, type ListTasksFilter } from '../core/tasks.js'
+import { createTask, listTasks, bindBranch, type CreateTaskInput, type ListTasksFilter } from '../core/tasks.js'
 import { closePool } from '../db/pool.js'
 import type { Task } from '../core/types.js'
 
@@ -66,9 +66,26 @@ export function parseListArgs(argv: string[]): ListTasksFilter {
   }
 }
 
+export interface BindBranchArgs {
+  id: string
+  branch: string
+}
+
+/** `bion task bind-branch <taskId> <branch>` (directive-91) — the real integration point for
+ *  recording a task↔branch association when work actually starts. Two positionals, no flags:
+ *  matches this CLI's own existing shape (`create`'s id is positional too) rather than inventing
+ *  a `--branch` flag for what's really just two required arguments. */
+export function parseBindBranchArgs(argv: string[]): BindBranchArgs {
+  const { positional } = parseTaskArgv(argv)
+  const [id, branch] = positional
+  if (!id || !branch) throw new Error('usage: bion task bind-branch <task-id> <branch>')
+  return { id, branch }
+}
+
 export function formatTask(t: Task): string {
   const deps = t.dependencies.length ? t.dependencies.join(',') : '-'
-  return `${t.id}  [${t.status}]  ratified=${t.ratified}  owner=${t.owner ?? '-'}  project=${t.project ?? '-'}  prio=${t.priority}  deps=${deps}  "${t.title}"`
+  const branch = t.branch ? `  branch=${t.branch}` : ''
+  return `${t.id}  [${t.status}]  ratified=${t.ratified}  owner=${t.owner ?? '-'}  project=${t.project ?? '-'}  prio=${t.priority}  deps=${deps}${branch}  "${t.title}"`
 }
 
 export function formatTaskList(tasks: Task[]): string {
@@ -83,8 +100,13 @@ async function main(): Promise<void> {
   } else if (cmd === 'list') {
     const tasks = await listTasks(parseListArgs(rest))
     console.log(formatTaskList(tasks))
+  } else if (cmd === 'bind-branch') {
+    const { id, branch } = parseBindBranchArgs(rest)
+    const task = await bindBranch(id, branch)
+    if (!task) throw new Error(`bind-branch: no ratified task "${id}" found (unratified or nonexistent — binding requires a ratified task)`)
+    console.log(formatTask(task))
   } else {
-    throw new Error('usage: bion task <create|list> ...')
+    throw new Error('usage: bion task <create|list|bind-branch> ...')
   }
 }
 
