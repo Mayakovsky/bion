@@ -17,7 +17,7 @@
     "mail": "tsx src/cli/mail.ts",
     "mcp:desktop-mail": "tsx src/mcp/desktopMail.ts",
     "auto-report": "tsx src/cli/autoReport.ts",
-    "test": "vitest run",
+    "test": "vitest run --reporter=default --reporter=json --outputFile=.bion-test-result.json",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.build.json",
