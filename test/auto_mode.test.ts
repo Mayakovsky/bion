@@ -130,6 +130,19 @@ describe('BION_AUTO_SCOPE task-scope filter (directive-23 Part B)', () => {
   })
 })
 
+describe('Terminal `superseded` status (directive-126)', () => {
+  it('excluded from selectAutoWork() identically to blocked', async () => {
+    const task = await ratifiedTaskInTopProject()
+    try {
+      await setTaskStatus(task.id, 'superseded')
+      const pick = await selectAutoWork()
+      expect(pick).toBeNull()
+    } finally {
+      await cleanupRatifiedTask(task)
+    }
+  })
+})
+
 describe('Auto Mode — ordered projects, pivot-on-block, shadow-gated (E3)', () => {
   it('pivot-on-block: skips a blocked earlier-project task and advances to the next', async () => {
     const base = await minOrdinal()
