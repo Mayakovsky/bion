@@ -20,7 +20,7 @@ export interface Task {
   description: string
   owner: string | null
   priority: number
-  status: 'backlog' | 'ready' | 'in_progress' | 'blocked' | 'done' | 'failed'
+  status: 'backlog' | 'ready' | 'in_progress' | 'blocked' | 'done' | 'failed' | 'superseded'
   dependencies: string[]
   ratified: boolean
   project: string | null
