@@ -35,6 +35,8 @@ export { parseVitestJson, readVitestResultFile, pollTests, createTestPollState, 
 export type { VitestJson, RunMeta, TestPollState } from './watchers/testWatcher.js'
 export { commitSignal, branchSignal, readGitHead, pollGit, createGitPollState } from './watchers/gitWatcher.js'
 export type { RepoRef, GitPollState } from './watchers/gitWatcher.js'
+export { pollCI, createCIPollState, resolveGhSlug, parseVitestFailedLog } from './watchers/ciWatcher.js'
+export type { CIPollState, CIPollConfig, GhRun } from './watchers/ciWatcher.js'
 export { discoverRepos, defaultIgnorePath, BIONIGNORE_FILENAME } from './watchers/discovery.js'
 export type { DiscoveryOptions } from './watchers/discovery.js'
 export type { TestSignal, GitSignal, WatchSignal } from './watchers/types.js'

@@ -14,11 +14,29 @@ export interface TestHandleResult extends Partial<ReactiveOutcome> {
   dispatched: boolean
 }
 
-export async function handleTestSignal(signal: TestSignal, deps: ReactiveDeps): Promise<TestHandleResult> {
+export interface HandleTestSignalOptions {
+  /** events.source (directive-128): 'watcher:test' for local vitest-JSON-file runs (default),
+   *  'watcher:ci' for GitHub-Actions-sourced runs — lets a reader tell local vs. remote signal
+   *  apart without inspecting payload shape. */
+  source?: string
+  /** dedup_key namespace prefix (directive-128). Defaults to 'test', matching every dedup key
+   *  recorded before CI polling existed — unchanged for existing callers. CI-sourced signals use
+   *  'ci' so a CI run's numeric id can never collide with a local run's `<path>:<mtime>` id even
+   *  in the (currently impossible) case they'd otherwise coincide. */
+  dedupPrefix?: string
+}
+
+export async function handleTestSignal(
+  signal: TestSignal,
+  deps: ReactiveDeps,
+  opts: HandleTestSignalOptions = {},
+): Promise<TestHandleResult> {
   const mode = deps.mode ?? reactiveMode()
+  const source = opts.source ?? 'watcher:test'
+  const dedupPrefix = opts.dedupPrefix ?? 'test'
   const { deduped } = await recordEvent({
     kind: signal.passed ? 'test.passed' : 'test.failed',
-    source: 'watcher:test',
+    source,
     payload: {
       repo: signal.repo,
       branch: signal.branch,
@@ -28,7 +46,7 @@ export async function handleTestSignal(signal: TestSignal, deps: ReactiveDeps): 
       runId: signal.runId,
     },
     // Namespaced by repo, same reasoning as handleGitSignal (directive-27).
-    dedupKey: `test:${signal.repo}:${signal.branch}:${signal.runId}`,
+    dedupKey: `${dedupPrefix}:${signal.repo}:${signal.branch}:${signal.runId}`,
   })
 
   if (deduped) return { duplicate: true, passed: signal.passed, mode, dispatched: false }
