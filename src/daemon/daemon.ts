@@ -7,6 +7,7 @@ import { autoModeSetting } from '../auto/autoMode.js'
 import { closePool } from '../db/pool.js'
 import { pollGit, createGitPollState, type RepoRef } from '../watchers/gitWatcher.js'
 import { pollTests, createTestPollState } from '../watchers/testWatcher.js'
+import { pollCI, createCIPollState } from '../watchers/ciWatcher.js'
 import { discoverRepos } from '../watchers/discovery.js'
 import { KovAdapter } from '../adapters/kov.js'
 import type { ReactiveDeps } from '../loop/reactive.js'
@@ -32,6 +33,11 @@ export interface DaemonOptions {
   /** Poll for vitest JSON result files each tick and emit a test signal (live watcher,
    *  directive-27 Task 2). Default true. */
   watchTests?: boolean
+  /** Poll GitHub Actions for each watched repo's CI runs (rate-limited internally, not every
+   *  tick — directive-128). Default true. */
+  watchCI?: boolean
+  /** Override CIWatcher's per-repo poll interval (tests use a tiny value; default 5 min). */
+  ciPollIntervalMs?: number
   /** Reactive-engine deps for the test watcher (kov adapter, mailRoot, notify override) —
    *  tests isolate this; real runs fall back to a real KovAdapter + real notify. */
   reactiveDeps?: Partial<ReactiveDeps>
@@ -49,6 +55,7 @@ export interface DaemonOptions {
 // env.devRoot, re-discovered each tick so a repo added mid-run is picked up without a restart.
 const gitPollState = createGitPollState()
 const testPollState = createTestPollState()
+const ciPollState = createCIPollState()
 function watchedRepos(): RepoRef[] {
   return discoverRepos(env.devRoot)
 }
@@ -57,9 +64,12 @@ function watchedRepos(): RepoRef[] {
 export async function tick(n: number, opts: DaemonOptions = {}): Promise<Heartbeat> {
   await drainOutbox() // pending publishes/notifies; safe no-op when the queue is empty
   if (opts.watchGit ?? true) await pollGit(watchedRepos(), gitPollState)
-  if (opts.watchTests ?? true) {
+  if ((opts.watchTests ?? true) || (opts.watchCI ?? true)) {
     const deps: ReactiveDeps = { kov: new KovAdapter({ mailRoot: opts.reactiveDeps?.mailRoot }), ...opts.reactiveDeps }
-    await pollTests(watchedRepos(), testPollState, deps)
+    if (opts.watchTests ?? true) await pollTests(watchedRepos(), testPollState, deps)
+    if (opts.watchCI ?? true) {
+      await pollCI(watchedRepos(), ciPollState, deps, { pollIntervalMs: opts.ciPollIntervalMs })
+    }
   }
   if (opts.onTick) await opts.onTick(n)
   const hb: Heartbeat = {
