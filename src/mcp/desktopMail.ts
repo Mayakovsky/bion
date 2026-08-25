@@ -4,6 +4,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import { sendMail, pollMail, formatPollResult } from '../cli/mail.js'
+import { isValidProjectName, RESERVED_BOX_NAMES } from '../mailbox/mailbox.js'
 import { closePool } from '../db/pool.js'
 
 // Desktop mail MCP server (directive-73 Task 2). Desktop's own general-purpose `bion-postgres`
@@ -27,6 +28,12 @@ const SEND_MAIL_INPUT = {
   thread: z.string().optional(),
   type: z.string().optional(),
   summary: z.string().optional(),
+  project: z
+    .string()
+    .optional()
+    .describe(
+      'Mailbox scoping (directive-146/150/154) — same shape as `bion mail send --project`. Omitted → unscoped (the historical flat shape).',
+    ),
 }
 
 export function createDesktopMailServer(): McpServer {
@@ -42,6 +49,17 @@ export function createDesktopMailServer(): McpServer {
     },
     async (args) => {
       try {
+        if (args.project !== undefined && !isValidProjectName(args.project)) {
+          return {
+            isError: true,
+            content: [
+              {
+                type: 'text',
+                text: `send_mail failed: project cannot be one of the reserved box names (${[...RESERVED_BOX_NAMES].join(', ')}) — got "${args.project}"`,
+              },
+            ],
+          }
+        }
         const result = await sendMail({
           from: 'desktop',
           to: args.recipient,
@@ -52,6 +70,7 @@ export function createDesktopMailServer(): McpServer {
           thread: args.thread,
           type: args.type,
           summary: args.summary,
+          project: args.project,
         })
         const dedupNote = result.deduped ? ' (deduped: identical packet already existed)' : ''
         return {

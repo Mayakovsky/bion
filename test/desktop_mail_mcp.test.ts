@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
+import { existsSync } from 'node:fs'
 import { createDesktopMailServer, mailboxRoot } from '../src/index.js'
 
 // Exercises the real MCP protocol boundary (tool registration, zod argument validation, error
@@ -106,5 +107,46 @@ describe('desktop mail MCP server (directive-73 Task 2)', () => {
 
   it('mailboxRoot() honors BION_MAIL_ROOT the way these tests rely on', () => {
     expect(mailboxRoot()).toBe(root)
+  })
+
+  // directive-154: the real gap D-153 found — send_mail's schema had no `project` field, so every
+  // Desktop-originated send landed unscoped by omission regardless of intent. These prove the fix
+  // through the actual MCP protocol boundary (in-memory client<->server, real tool call), not by
+  // calling sendMail() directly — that path was already proven in D-150.
+  it('send_mail with project set lands in the real per-project subfolder, through the MCP path', async () => {
+    const { client } = await connectedClient()
+    // thread carries a fresh token each run — without it, identical literal content across two
+    // runs (e.g. this file run standalone, then again inside the full suite against the same real
+    // DB) hits the same dedup_key and silently returns the FIRST run's (now-stale) path instead of
+    // materializing a new one — a real bug this test itself hit and is now guarded against.
+    const sendResult = await client.callTool({
+      name: 'send_mail',
+      arguments: {
+        recipient: 'kov',
+        intent: 'status',
+        fields: { topic: 'mcp-project-test' },
+        note: 'directive-154 mcp project round trip',
+        project: 'scratch-d154-mcp',
+        thread: `t-d154-project-${randomUUID()}`,
+      },
+    })
+    expect(sendResult.isError).toBeFalsy()
+    const sendText = (sendResult.content as Array<{ type: string; text: string }>)[0]!.text
+    const pathMatch = sendText.match(/path (.+)$/)
+    expect(pathMatch, 'send_mail should report the real on-disk path').toBeTruthy()
+    const path = pathMatch![1]!.replace(/\\/g, '/')
+    expect(path).toContain('/kov/scratch-d154-mcp/unread/')
+    expect(existsSync(pathMatch![1]!)).toBe(true)
+  })
+
+  it('send_mail rejects a project matching a reserved box name, through the MCP path, before send() runs', async () => {
+    const { client } = await connectedClient()
+    const result = await client.callTool({
+      name: 'send_mail',
+      arguments: { recipient: 'kov', intent: 'status', fields: { a: 'b' }, project: 'unread' },
+    })
+    expect(result.isError).toBe(true)
+    const text = (result.content as Array<{ type: string; text: string }>)[0]!.text
+    expect(text).toContain('reserved box names')
   })
 })
