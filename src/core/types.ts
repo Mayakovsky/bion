@@ -12,6 +12,8 @@ export interface Message {
   content_sha256: string
   dedup_key: string
   origin: string
+  /** Mailbox scoping (directive-146/150, FDQ-B2). Null = unscoped (historical + unlabeled new mail). */
+  project: string | null
 }
 
 export interface Task {

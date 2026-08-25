@@ -13,7 +13,7 @@ export async function findUnconsumedByHash(
 ): Promise<Message | null> {
   const res = await exec.query<Message>(
     `SELECT m.id, m.ts, m.sender, m.recipient, m.thread, m.type, m.summary,
-            m.body_path, m.content_sha256, m.dedup_key, m.origin
+            m.body_path, m.content_sha256, m.dedup_key, m.origin, m.project
      FROM messages m
      WHERE m.recipient = $1 AND m.content_sha256 = $2
        AND NOT EXISTS (SELECT 1 FROM message_consumptions c WHERE c.message_id = m.id)

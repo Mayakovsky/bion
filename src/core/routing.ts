@@ -18,6 +18,8 @@ export interface RouteInput {
   type?: string
   summary?: string
   mailRoot?: string
+  /** Mailbox scoping (directive-146/150, FDQ-B2). Omitted → the historical flat shape/NULL. */
+  project?: string
   /** Notify dependency override — test isolation only; defaults to the real ntfy sender. */
   notify?: NotifyFn
 }
@@ -37,7 +39,9 @@ export interface RouteResult {
  */
 export async function routePacket(input: RouteInput): Promise<RouteResult> {
   const filename = `${randomUUID()}.md`
-  const finalPath = join(mailboxRoot(input.mailRoot), input.recipient, 'unread', filename)
+  const finalPath = input.project
+    ? join(mailboxRoot(input.mailRoot), input.recipient, input.project, 'unread', filename)
+    : join(mailboxRoot(input.mailRoot), input.recipient, 'unread', filename)
   const result = await withTransaction(async (client) => {
     const { message, deduped } = await send(
       {
@@ -49,6 +53,7 @@ export async function routePacket(input: RouteInput): Promise<RouteResult> {
         body: input.body,
         bodyPath: finalPath,
         origin: input.origin,
+        project: input.project,
       },
       client,
     )

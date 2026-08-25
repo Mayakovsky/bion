@@ -15,6 +15,8 @@ export interface SendInput {
   bodyPath?: string
   /** Explicit dedup key; defaults to a stable hash of the routing identity + content. */
   dedupKey?: string
+  /** Mailbox scoping (directive-146/150, FDQ-B2). Omitted/undefined → NULL (unscoped). */
+  project?: string
 }
 
 export interface SendResult {
@@ -34,10 +36,10 @@ export async function send(input: SendInput, exec: Executor = pool()): Promise<S
     input.dedupKey ?? dedupKey(input.sender, input.recipient, input.thread ?? '', contentSha)
 
   const inserted = await exec.query<Message>(
-    `INSERT INTO messages (sender, recipient, thread, type, summary, body_path, content_sha256, dedup_key, origin)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    `INSERT INTO messages (sender, recipient, thread, type, summary, body_path, content_sha256, dedup_key, origin, project)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      ON CONFLICT (dedup_key) DO NOTHING
-     RETURNING id, ts, sender, recipient, thread, type, summary, body_path, content_sha256, dedup_key, origin`,
+     RETURNING id, ts, sender, recipient, thread, type, summary, body_path, content_sha256, dedup_key, origin, project`,
     [
       input.sender,
       input.recipient,
@@ -48,6 +50,7 @@ export async function send(input: SendInput, exec: Executor = pool()): Promise<S
       contentSha,
       key,
       input.origin,
+      input.project ?? null,
     ],
   )
 
@@ -57,7 +60,7 @@ export async function send(input: SendInput, exec: Executor = pool()): Promise<S
 
   // Duplicate: return the pre-existing row unchanged.
   const existing = await exec.query<Message>(
-    `SELECT id, ts, sender, recipient, thread, type, summary, body_path, content_sha256, dedup_key, origin
+    `SELECT id, ts, sender, recipient, thread, type, summary, body_path, content_sha256, dedup_key, origin, project
      FROM messages WHERE dedup_key = $1`,
     [key],
   )

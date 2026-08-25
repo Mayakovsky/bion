@@ -4,6 +4,7 @@ import { closePool } from '../db/pool.js'
 import { pointer, serialize, parse, validate } from '../comms/protocol.js'
 import { KovAdapter } from '../adapters/kov.js'
 import { DesktopAdapter } from '../adapters/desktop.js'
+import { isValidProjectName, RESERVED_BOX_NAMES } from '../mailbox/mailbox.js'
 import type { AgentAdapter, DispatchResult, PollResult } from '../adapters/types.js'
 
 // `bion mail send` / `bion mail poll` (directive-71) — CLI over the mailbox that already exists
@@ -55,17 +56,25 @@ export interface SendArgs {
   thread?: string
   type?: string
   summary?: string
+  /** Mailbox scoping (directive-146/150, FDQ-B2). Omitted → unscoped, the historical flat shape. */
+  project?: string
 }
 
 const SEND_USAGE =
   'usage: bion mail send --from <kov|desktop> --to <kov|desktop> --intent <opcode> ' +
-  '[--refs a,b,c] [--field k=v ...] [--note "<text>"] [--thread <id>] [--type <type>] [--summary <text>]'
+  '[--refs a,b,c] [--field k=v ...] [--note "<text>"] [--thread <id>] [--type <type>] [--summary <text>] ' +
+  '[--project <id>]'
 
 export function parseSendArgs(argv: string[]): SendArgs {
   const { flags, fields } = parseMailArgv(argv)
   if (!flags.from) throw new Error(SEND_USAGE)
   if (!flags.to) throw new Error('--to is required')
   if (!flags.intent) throw new Error('--intent is required')
+  if (flags.project !== undefined && !isValidProjectName(flags.project)) {
+    throw new Error(
+      `--project cannot be one of the reserved box names (${[...RESERVED_BOX_NAMES].join(', ')}) — got "${flags.project}"`,
+    )
+  }
   return {
     from: flags.from,
     to: flags.to,
@@ -76,6 +85,7 @@ export function parseSendArgs(argv: string[]): SendArgs {
     thread: flags.thread,
     type: flags.type,
     summary: flags.summary,
+    project: flags.project,
   }
 }
 
@@ -115,6 +125,7 @@ export async function sendMail(args: SendArgs, opts: { mailRoot?: string } = {})
     thread: args.thread,
     type: args.type,
     summary: args.summary,
+    project: args.project,
   })
 }
 

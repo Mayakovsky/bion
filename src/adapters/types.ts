@@ -11,6 +11,8 @@ export interface Packet {
   thread?: string
   summary?: string
   type?: string
+  /** Mailbox scoping (directive-146/150, FDQ-B2). Omitted → the historical flat shape/NULL. */
+  project?: string
 }
 
 export interface DispatchResult {
