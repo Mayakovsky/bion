@@ -2,9 +2,7 @@
 
 A thin, owned **TypeScript coordinator** for a multi-agent workflow: a chat-native agent (e.g.
 **Claude Desktop**) as architect, paired with a **Claude Code CLI** instance running in a terminal
-as implementer. "Kov" and "Desktop" are just this deployment's own nicknames for that pairing —
-swap in whatever names you want for your own CLI agent; nothing about Bion is tied to a specific
-name, only to the *shape* of the pairing (one chat-native reasoning agent, one terminal-native
+as implementer. Bion is a specific *shape* of pairing (one chat-native reasoning agent, one terminal-native
 coding agent).
 
 ## What Bion actually is
