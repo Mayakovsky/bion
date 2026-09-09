@@ -7,7 +7,7 @@ coding agent).
 
 ## What Bion actually is
 
-Bion is not a third AI in the loop. It's deterministic — **no LLM inside it.** It observes,
+Bion is not a third AI in the loop. It's deterministic — **no LLM inside.** It observes,
 records, routes, and notifies; it never reasons or judges. All the actual thinking still happens
 in the two agents. What Bion owns is the boundary between them: project state, task routing, agent
 messaging, and comms — over rails it runs itself (Postgres for relational state + full-text
