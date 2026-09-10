@@ -1,23 +1,22 @@
 # Bion
 
-A thin, owned **TypeScript coordinator** for a multi-agent workflow: a chat-native agent (e.g.
-**Claude Desktop**) as architect, paired with a **Claude Code CLI** instance running in a terminal
-as implementer. Bion is a specific *shape* of pairing (one chat-native reasoning agent, one terminal-native
-coding agent).
+Bion is a communication layer allowing two agents using cheaper models to collaborate and amplify their efforts.
+
+A thin, owned **TypeScript coordinator** for Dyadic Workflow: specifically pairing one chat-native reasoning agent and one terminal-native coding agent, to amplify the efforts of less expensive models.  In this case, **Claude Desktop** as architect, paired with a **Claude Code CLI** instance running in a terminal as implementer.
 
 ## What Bion actually is
 
-Bion is not a third AI in the loop. It's deterministic — **no LLM inside.** It observes,
-records, routes, and notifies; it never reasons or judges. All the actual thinking still happens
-in the two agents. What Bion owns is the boundary between them: project state, task routing, agent
-messaging, and comms — over rails it runs itself (Postgres for relational state + full-text
+Bion is not a third AI in the loop. It's deterministic — **no LLM inside.** The system observes,
+records, routes, and notifies; but never reasons or judges. All the actual thinking still happens
+with the two agents. What Bion owns is the boundary between them: project state, task routing, agent
+messaging, and comms — over rails the system runs itself (Postgres for relational state + full-text
 search, disk + git for the artifact corpus and a file-based mailbox). Bion does **relational state
 + FTS only**; it grows no retrieval engine, and semantic/vector/graph memory is deliberately out of
 scope.
 
 ## Why this setup saves tokens — and money
 
-The default way to run a chat agent alongside a CLI coding agent is manual relay: a human
+The earlier way to run a chat agent alongside a CLI coding agent was manual relay: a human
 copy-pastes context back and forth between the two, re-explaining current state on every
 hand-off. That either burns tokens re-deriving history each time, or drops detail because a human
 summarized it from memory. Bion removes both failure modes, for a specific, structural reason:
