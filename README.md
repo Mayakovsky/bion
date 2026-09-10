@@ -1,14 +1,16 @@
 # Bion
 
-Bion is a communication layer allowing two agents using cheaper models to collaborate and amplify their efforts.
+Essentially, in my work I've discovered pairing lower tier models in adversarial alignment produces better coding work, less hallucination, and less token costs.  Instead of taming the model, the pair tames itself in a loop.
 
-A thin, owned **TypeScript coordinator** for Dyadic Workflow: specifically pairing one chat-native reasoning agent and one terminal-native coding agent, to amplify the efforts of less expensive models.  In this case, **Claude Desktop** as architect, paired with a **Claude Code CLI** instance running in a terminal as implementer.
+Bion is a communication posture and infra layer for fusing two agents into a collaborative unit.
+
+A thin, owned **TypeScript coordinator** for Dyadic Workflow: specifically pairing one chat-native reasoning agent and one terminal-native coding agent.  In this case, **Claude Desktop** as architect, paired with a **Claude Code CLI** instance running in a terminal as implementer. Both running Sonnet 5.
 
 ## What Bion actually is
 
 Bion is not a third AI in the loop. It's deterministic — **no LLM inside.** The system observes,
-records, routes, and notifies; but never reasons or judges. All the actual thinking still happens
-with the two agents. What Bion owns is the boundary between them: project state, task routing, agent
+records, routes, and notifies; but never reasons or judges. All actual thinking still happens
+with the two agents. Bion is the neurology between them: project state, task routing, agent
 messaging, and comms — over rails the system runs itself (Postgres for relational state + full-text
 search, disk + git for the artifact corpus and a file-based mailbox). Bion does **relational state
 + FTS only**; it grows no retrieval engine, and semantic/vector/graph memory is deliberately out of
@@ -16,7 +18,7 @@ scope.
 
 ## Why this setup saves tokens — and money
 
-The earlier way to run a chat agent alongside a CLI coding agent was manual relay: a human
+The earlier way to run a chat agent alongside CLI coding agents was manual relay: a human
 copy-pastes context back and forth between the two, re-explaining current state on every
 hand-off. That either burns tokens re-deriving history each time, or drops detail because a human
 summarized it from memory. Bion removes both failure modes, for a specific, structural reason:
