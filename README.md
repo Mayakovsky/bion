@@ -13,7 +13,7 @@ records, routes, and notifies; but never reasons or judges. All actual thinking 
 with the two agents. Bion is the neurology between them: project state, task routing, agent
 messaging, and comms — over rails the system runs itself (Postgres for relational state + full-text
 search, disk + git for the artifact corpus and a file-based mailbox). Bion does **relational state
-+ FTS only**; it grows no retrieval engine, and semantic/vector/graph memory is deliberately out of
+and FTS only** - it grows no retrieval engine, and semantic/vector/graph memory is deliberately out of
 scope.
 
 ## Why this setup saves tokens — and money
