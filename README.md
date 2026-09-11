@@ -1,10 +1,8 @@
 # Bion
 
-Essentially, in my work I've discovered pairing lower tier models in adversarial alignment produces better coding work, less hallucination, and less token costs.  Instead of taming the model, the pair tames itself in a loop.
+Working with AI, I've discovered pairing lower tier models in adversarial alignment produces better coding work, less hallucination, and less token costs.  Instead of taming the model, the pair tames itself in a loop.  Their independence means less human involvement. Their machine communications cut down descriptive bloat.
 
-Bion is a communication posture and infra layer for fusing two agents into a collaborative unit.
-
-A thin, owned **TypeScript coordinator** for Dyadic Workflow: specifically pairing one chat-native reasoning agent and one terminal-native coding agent.  In this case, **Claude Desktop** as architect, paired with a **Claude Code CLI** instance running in a terminal as implementer. Both running Sonnet 5.
+Bion is a communication posture and infra layer for fusing two agents into a collaborative unit.  A thin, owned **TypeScript coordinator** for Dyadic Workflow: specifically pairing one chat-native reasoning agent and one terminal-native coding agent.  In this case, **Claude Desktop** as architect, paired with a **Claude Code CLI** instance running in a terminal as implementer. Both running Sonnet 5.
 
 ## What Bion actually is
 
