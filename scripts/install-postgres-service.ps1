@@ -3,14 +3,14 @@
 # elevated-handoff pattern -- Kov's sandboxed session cannot register services or configure
 # Service Recovery actions, so this is a complete, ready-to-run script instead of a fragment.
 #
-# BION-POSTGRES-SERVICE-REGISTRATION-KOV-directive.md, Task 2. Closes the tradeoff from
-# POSTGRES-CLUSTER-RESILIENCE-REPORT-KOV.md: Bion's cluster currently has NO OS-level autostart
-# or crash-recovery mechanism at all -- it only runs because someone ran pg-start.sh by hand.
+# Closes the tradeoff noted in an internal cluster-resilience report: Bion's cluster
+# currently has NO OS-level autostart or crash-recovery mechanism at all -- it only runs
+# because someone ran pg-start.sh by hand.
 #
 # Account: LocalSystem (pg_ctl register's default when -U/-P are omitted), NOT
 # NT AUTHORITY\NetworkService (Cluster A's account) -- checked first, not assumed:
-# `Get-Acl C:\Users\kidco\.bion-pg\data` shows only NT AUTHORITY\SYSTEM, BUILTIN\Administrators,
-# and Polytropos\kidco have any access; NetworkService has none and would fail to start against
+# `Get-Acl $dataDir` shows only NT AUTHORITY\SYSTEM, BUILTIN\Administrators, and this machine's
+# own user account have any access; NetworkService has none and would fail to start against
 # this directory. LocalSystem already has FullControl, so no ACL change and no stored password
 # are needed -- the minimal-change option, not a security downgrade from Cluster A's setup
 # (which only works for NetworkService because the official installer set matching ACLs on ITS
@@ -24,7 +24,9 @@
 #   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install-postgres-service.ps1
 $ErrorActionPreference = 'Stop'
 $pgCtl = "C:\Program Files\PostgreSQL\16\bin\pg_ctl.exe"
-$dataDir = "C:\Users\kidco\.bion-pg\data"
+# Matches the bash-side scripts' $HOME/.bion-pg/data default (provision-db.sh, pg-start.sh) --
+# BION_PGDATA override kept in sync with those, not a new/independent convention.
+$dataDir = if ($env:BION_PGDATA) { $env:BION_PGDATA } else { Join-Path $env:USERPROFILE '.bion-pg\data' }
 $serviceName = "postgresql-bion-5433"
 
 if (-not (Test-Path $pgCtl)) { throw "pg_ctl not found at $pgCtl -- confirm the PostgreSQL 16 install path before proceeding." }
