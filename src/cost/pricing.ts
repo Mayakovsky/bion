@@ -1,4 +1,4 @@
-// Model pricing table (directive-18 §Section A/3). $ per million tokens.
+// Model pricing table. $ per million tokens.
 //
 // PLACEHOLDER RATES — matched by family keyword (opus/sonnet/haiku), not exact model string,
 // because list pricing moves and Bion shouldn't need a code change for every point release.

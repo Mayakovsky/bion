@@ -4,9 +4,9 @@ import { createTask, listTasks, bindBranch, type CreateTaskInput, type ListTasks
 import { closePool } from '../db/pool.js'
 import type { Task } from '../core/types.js'
 
-// `bion task` (directive-19) — read/write CLI on `tasks`, sibling to `bion status`/`bion cost`.
-// No --ratified flag, ever: the runtime role lacks the column privilege for it (directive-01
-// ruling 3) — ratification is scripts/ratify-task.sh / scripts/ratify-project.sh, owner-lane only.
+// `bion task` — read/write CLI on `tasks`, sibling to `bion status`/`bion cost`.
+// No --ratified flag, ever: the runtime role lacks the column privilege for it —
+// ratification is scripts/ratify-task.sh / scripts/ratify-project.sh, owner-lane only.
 
 export interface ParsedFlags {
   positional: string[]
@@ -71,7 +71,7 @@ export interface BindBranchArgs {
   branch: string
 }
 
-/** `bion task bind-branch <taskId> <branch>` (directive-91) — the real integration point for
+/** `bion task bind-branch <taskId> <branch>` — the real integration point for
  *  recording a task↔branch association when work actually starts. Two positionals, no flags:
  *  matches this CLI's own existing shape (`create`'s id is positional too) rather than inventing
  *  a `--branch` flag for what's really just two required arguments. */

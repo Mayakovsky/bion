@@ -40,7 +40,7 @@ function findBucket(scale: CostScale, triggerClass: string) {
 // Section B: the reporting surface (bion cost) + the sanity guard, over a shared test DB —
 // every assertion is scoped to a unique trigger_class tag so concurrent tests' rows can't interfere
 // (same convention as status.test.ts's before/after deltas).
-describe('bion cost (directive-18 §Section B)', () => {
+describe('bion cost', () => {
   it('groups by seat × trigger_class × model at the session scale, keyed by payload.sessionId', async () => {
     const trigger = `t-session-${randomUUID().slice(0, 8)}`
     const sessionId = `sess-${randomUUID()}`

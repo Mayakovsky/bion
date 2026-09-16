@@ -3,11 +3,11 @@
 #
 # This is intentionally OUTSIDE Bion's runtime authority: bion_rw lacks the column privilege,
 # so ratifying a task (defining the auto-wake dispatch envelope) requires the owner lane
-# (BION_MIGRATE_URL / bion_owner). Bion never runs this itself (inv 13; directive-01 ruling 3).
+# (BION_MIGRATE_URL / bion_owner). Bion never runs this itself (inv 13).
 #
 # Usage: BION_MIGRATE_URL=... bash scripts/ratify-task.sh <task-id>
 #
-# NOTE (fixed alongside directive-19): on this psql build, `-v`-substituted variables in a
+# NOTE: on this psql build, `-v`-substituted variables in a
 # `-c "..."` command are silently NOT interpolated (`:'id'` reached the server literally and
 # errored) — substitution only works reading from stdin/-f. The connection string must also come
 # AFTER the flags, or getopt stops parsing there and everything after is "ignored" as an extra

@@ -7,8 +7,8 @@ import { handleTestSignal } from './handler.js'
 import type { ReactiveDeps } from '../loop/reactive.js'
 
 // Test-output watcher: normalizes a vitest JSON reporter result into a TestSignal, then polls for
-// result files the same way gitWatcher polls HEAD — file-drop + poll, not grey importing Bion
-// (directive-27 Task 2). Convention: a repo's test invocation runs vitest with
+// result files the same way gitWatcher polls HEAD — file-drop + poll, not grey importing Bion.
+// Convention: a repo's test invocation runs vitest with
 // `--reporter=default --reporter=json --outputFile=.bion-test-result.json` (default reporter kept
 // so humans still see normal terminal output; json is additive). grey's turborepo runs `vitest run`
 // per-package (`turbo run test`, 7 packages, confirmed by reading grey/package.json + turbo.json —

@@ -13,7 +13,7 @@ export interface RecordInput {
 
 /**
  * record(snippet) — commit a decision/finding to Bion's ledger (no recipient; a ledger write).
- * Distinct from send() (a routed message). See spec §3.3.
+ * Distinct from send() (a routed message).
  */
 export async function record(input: RecordInput): Promise<Decision> {
   const id = input.id ?? newId('DEC')

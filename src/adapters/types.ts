@@ -1,7 +1,7 @@
 import type { Message } from '../core/types.js'
 
 // AgentAdapter — reuses the M6 ChannelIngress shape (dispatch / pollStatus / capabilities).
-// Agents are "channels"; they never talk to each other directly, only through Bion (spec §5).
+// Agents are "channels"; they never talk to each other directly, only through Bion.
 
 export interface Packet {
   sender: string
@@ -11,7 +11,7 @@ export interface Packet {
   thread?: string
   summary?: string
   type?: string
-  /** Mailbox scoping (directive-146/150, FDQ-B2). Omitted → the historical flat shape/NULL. */
+  /** Mailbox scoping. Omitted → the historical flat shape/NULL. */
   project?: string
 }
 

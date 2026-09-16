@@ -13,7 +13,7 @@ function capture() {
   return { calls, notify: async (i: NotifyInput) => (calls.push(i), { sent: true, dryRun: false, status: 200 }) }
 }
 
-describe('escalate intent -> notifyDurably (directive-71 Task 2)', () => {
+describe('escalate intent -> notifyDurably', () => {
   it('a routePacket() call with an escalate-intent body triggers exactly one notifyDurably call, deduped on the message id', async () => {
     const root = freshRoot()
     const { calls, notify } = capture()

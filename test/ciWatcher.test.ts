@@ -16,13 +16,13 @@ import {
   type GhRun,
 } from '../src/index.js'
 
-// Direct pollCI coverage (directive-128). The GitHub-fetching functions are injected (fake, no
+// Direct pollCI coverage. The GitHub-fetching functions are injected (fake, no
 // network) so control flow — rate-limiting, per-repo isolation, non-test-job filtering, dedup
 // namespacing — is verified offline and deterministically. resolveGhSlug and
 // parseVitestFailedLog are real functions tested for real (local git; a captured real log
 // fixture) — no network needed for either. Real end-to-end verification against the actual
-// GitHub API (the two known 2026-08-17 bion failures) was run manually and is reported in
-// _internal/BION-DIRECTIVE-128-STATUS.md, not baked into this always-runs suite.
+// GitHub API (the two known 2026-08-17 bion failures) was run manually and is recorded
+// internally, not baked into this always-runs suite.
 
 function git(cwd: string, args: string[]): string {
   return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
@@ -46,7 +46,7 @@ async function eventCount(kind: string, repo: string): Promise<number> {
 }
 
 // Real transcript, captured 2026-08-23 from `gh run view 31987960402 --log-failed` against the
-// real bion repo's actual 2026-08-17 CI failure (D-125's Task 3 fixture) — not synthesized.
+// real bion repo's actual 2026-08-17 CI failure — not synthesized.
 const REAL_LOG_FAILED_FIXTURE = `test\tRun pnpm test\t2026-08-17T02:26:44.8463464Z \x1b[31m❯\x1b[39m test/env.test.ts \x1b[2m(\x1b[22m\x1b[2m2 tests\x1b[22m\x1b[2m | \x1b[22m\x1b[31m1 failed\x1b[39m\x1b[2m)\x1b[22m\x1b[90m 6\x1b[2mms\x1b[22m\x1b[39m
 test\tRun pnpm test\t2026-08-17T02:26:44.9395698Z \x1b[31m\x1b[1m\x1b[7m FAIL \x1b[27m\x1b[22m\x1b[39m test/env.test.ts\x1b[2m > \x1b[22menv loading is cwd-independent (directive-11)\x1b[2m > \x1b[22mresolveEnvPath points at the repo-root .env.local regardless of cwd, and both vars load
 test\tRun pnpm test\t2026-08-17T02:26:44.9583414Z \x1b[2m      Tests \x1b[22m \x1b[1m\x1b[31m1 failed\x1b[39m\x1b[22m\x1b[2m | \x1b[22m\x1b[1m\x1b[32m161 passed\x1b[39m\x1b[22m\x1b[90m (162)\x1b[39m`
@@ -264,7 +264,7 @@ describe('pollCI — control flow, offline via injected fetchers', () => {
   })
 })
 
-describe('CI vs local dedup namespacing (directive-128)', () => {
+describe('CI vs local dedup namespacing', () => {
   it('a CI-sourced and a local-sourced signal sharing the same repo/branch/runId string record as two distinct events', async () => {
     const repoName = `dedup-ns-${randomUUID()}`
     const root = join(tmpdir(), `bion-mail-${randomUUID()}`)

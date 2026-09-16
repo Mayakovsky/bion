@@ -8,7 +8,7 @@ export interface EventInput {
   payload?: Record<string, unknown>
   /** Explicit dedup key; defaults to a stable hash of kind + source + payload. */
   dedupKey?: string
-  /** Cost attribution (directive-18) — omit on non-cost events. */
+  /** Cost attribution — omit on non-cost events. */
   targetSeat?: CostSeat
   triggerClass?: string
   model?: string
@@ -26,7 +26,7 @@ export interface EventResult {
 
 /**
  * Append an event. Idempotent on dedup_key: duplicate completion/watcher signals collapse
- * to a single row (spec §10 risk mitigation).
+ * to a single row (a deliberate risk mitigation).
  */
 const EVENT_COLUMNS = `id, ts, kind, payload, source, dedup_key,
    target_seat, trigger_class, model, tokens_in, tokens_out, est_cost::float8 AS est_cost, is_approximate`

@@ -27,7 +27,7 @@ async function loadEdges(): Promise<Map<string, string[]>> {
  * BEFORE inserting; throws CycleError otherwise.
  *
  * `ratified` is intentionally never written here — the runtime role lacks the column
- * privilege (directive-01 ruling 3). New tasks default to ratified=false.
+ * privilege. New tasks default to ratified=false.
  */
 export async function createTask(input: CreateTaskInput): Promise<Task> {
   const deps = input.dependencies ?? []
@@ -111,7 +111,7 @@ export async function setTaskStatus(
 }
 
 /**
- * Explicit task↔branch binding (directive-91) — record real work starting on a ratified task,
+ * Explicit task↔branch binding — record real work starting on a ratified task,
  * so `reactive.ts` can look the task up directly instead of guessing from the branch name.
  * Only binds a ratified task (mirrors `decide()`'s own "not-ratified-branch" gate in reactive.ts —
  * binding an unratified task's branch would just create a dead association nothing can dispatch

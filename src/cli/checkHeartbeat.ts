@@ -5,11 +5,11 @@ import { repoPath } from '../paths.js'
 import { isDaemonAlive, readHeartbeat, heartbeatPath } from '../daemon/heartbeat.js'
 import { notifyForces, type NotifyFn } from '../notify/ntfy.js'
 
-// `bion check-heartbeat` (BION-HEARTBEAT-ALERTING-KOV-directive.md) — a standalone liveness
+// `bion check-heartbeat` — a standalone liveness
 // probe, deliberately NOT part of the daemon: the whole point is to notice when the daemon
 // itself is dead, so it can't depend on the daemon (or its DB pool) to run. No DB access here —
 // just a heartbeat-file read + a direct ntfy POST, same as `isDaemonAlive`'s existing 120s
-// default (already ~2.7x the daemon's 45s tick — picked BEFORE this directive, kept for
+// default (already ~2.7x the daemon's 45s tick — picked independently, kept for
 // consistency with what `bion status` already calls "down").
 //
 // Edge-triggered, not level-triggered: alerts once on the healthy->stale transition, once more
@@ -65,7 +65,7 @@ export async function checkHeartbeat(deps: CheckDeps = {}): Promise<{ outcome: C
     const ageStr = hb ? `${Math.round(ageMs! / 1000)}s` : 'no heartbeat file at all'
     await notify({
       title: 'Bion daemon DOWN',
-      message: `heartbeat stale (${ageStr}, threshold ${STALE_MAX_AGE_MS / 1000}s). Check now — this either means the daemon crashed or its scheduled task didn't survive a session/logon boundary (known failure mode, see BION-DAEMON-LIVENESS-URGENT-CHECK-REPORT-KOV.md). Run "bion status" or check .bion/daemon/daemon.log on the box.`,
+      message: `heartbeat stale (${ageStr}, threshold ${STALE_MAX_AGE_MS / 1000}s). Check now — this either means the daemon crashed or its scheduled task didn't survive a session/logon boundary (a known failure mode). Run "bion status" or check .bion/daemon/daemon.log on the box.`,
       priority: 5,
       tags: ['bion', 'daemon', 'warning', 'rotating_light'],
     })

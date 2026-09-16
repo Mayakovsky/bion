@@ -49,12 +49,12 @@ describe('write→register→query round-trip', () => {
   })
 })
 
-// Gate A extended (directive-146/150, FDQ-B2): the per-project mailbox scoping's own real
+// The per-project mailbox scoping's own real
 // write->register->query round-trip, against the REAL live DB — same gate, real recipient/project
 // pair scratch-scoped so it can never touch the real kov/desktop boxes. mailRoot is an isolated
 // tmpdir (not the real .bion/mail) so this test writes/reads real files without leaving permanent
 // scratch clutter in the live mailbox tree on every run.
-describe('mailbox per-project scoping — real DB round-trip (build-and-prove-clean, cutover held per D-150)', () => {
+describe('mailbox per-project scoping — real DB round-trip (build-and-prove-clean, cutover intentionally held)', () => {
   it('routePacket + drainOutbox + pollStatus-equivalent round-trips a project-scoped packet end to end', async () => {
     const root = join(tmpdir(), `bion-mail-scratch-d150-${randomUUID()}`)
     const recipient = 'scratch-d150-recipient'

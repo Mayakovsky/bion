@@ -1,9 +1,9 @@
-// Normalized signals emitted by watchers. Both signal kinds are multi-repo (directive-27).
+// Normalized signals emitted by watchers. Both signal kinds are multi-repo.
 
 export interface TestSignal {
   kind: 'test'
   /** Short label for the watched repo (e.g. 'bion', 'grey') — never a filesystem path. Required,
-   *  same posture as GitSignal.repo (directive-27). */
+   *  same posture as GitSignal.repo. */
   repo: string
   branch: string
   passed: boolean
@@ -19,7 +19,7 @@ export interface GitSignal {
   event: 'commit' | 'branch'
   /** Short label for the watched repo (e.g. 'bion', 'grey') — never a filesystem path. Required,
    *  not optional: every call site names its repo explicitly so no reader has to guess what an
-   *  absent field means (directive-27). */
+   *  absent field means. */
   repo: string
   branch: string
   sha: string

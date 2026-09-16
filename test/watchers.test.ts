@@ -79,7 +79,7 @@ describe('reactive mode = off (default live behavior)', () => {
     expect(r.taskId).toBeTruthy()
     const task = await getTask(r.taskId!)
     expect(task).toBeTruthy()
-    expect(task!.ratified).toBe(false) // never auto-ratified (inv 13 / FDQ-B3)
+    expect(task!.ratified).toBe(false) // never auto-ratified (inv 13)
     expect(calls).toHaveLength(1)
     expect((await kov.pollStatus()).consumed).toHaveLength(0) // NO dispatch to Kov
     expect((await desktop.pollStatus()).consumed).toHaveLength(1) // review queued for Desktop

@@ -18,7 +18,7 @@ export interface RouteInput {
   type?: string
   summary?: string
   mailRoot?: string
-  /** Mailbox scoping (directive-146/150, FDQ-B2). Omitted → the historical flat shape/NULL. */
+  /** Mailbox scoping. Omitted → the historical flat shape/NULL. */
   project?: string
   /** Notify dependency override — test isolation only; defaults to the real ntfy sender. */
   notify?: NotifyFn
@@ -33,8 +33,8 @@ export interface RouteResult {
 /**
  * Route a packet durably: commit the authoritative `messages` row AND its publish-outbox entry in
  * ONE transaction, then let the drainer materialize the file. Two guarantees fall out:
- *  - a packet is never observable in unread/ before its row exists (subsumes fix-b8 / FDQ-B8);
- *  - the body is persisted in the outbox, so a crash before publish is fully recoverable (D1).
+ *  - a packet is never observable in unread/ before its row exists;
+ *  - the body is persisted in the outbox, so a crash before publish is fully recoverable.
  * This does NOT publish; callers drain (immediately in-process, or via the reconciler on restart).
  */
 export async function routePacket(input: RouteInput): Promise<RouteResult> {
@@ -71,7 +71,7 @@ export async function routePacket(input: RouteInput): Promise<RouteResult> {
   })
 
   // Best-effort, OUTSIDE the transaction and on the runtime pool, not the checked-out client:
-  // a cost-estimate failure must never roll back or block the actual dispatch (directive-18).
+  // a cost-estimate failure must never roll back or block the actual dispatch.
   if (!result.deduped) {
     await recordDesktopCostSafely({
       body: input.body,
@@ -82,7 +82,7 @@ export async function routePacket(input: RouteInput): Promise<RouteResult> {
     })
   }
 
-  // directive-71 Task 2: intent=escalate must reach Forces immediately, not wait for a mailbox
+  // intent=escalate must reach Forces immediately, not wait for a mailbox
   // check. Wired here (routePacket), not BaseAdapter.dispatch(), because this is the ONE funnel
   // every route commits through — both adapter dispatch() and reactive.ts's direct routePacket()
   // calls — so an escalate packet can never bypass the notify regardless of caller. Deduped on the

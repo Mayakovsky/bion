@@ -15,11 +15,11 @@ export interface TestHandleResult extends Partial<ReactiveOutcome> {
 }
 
 export interface HandleTestSignalOptions {
-  /** events.source (directive-128): 'watcher:test' for local vitest-JSON-file runs (default),
+  /** events.source: 'watcher:test' for local vitest-JSON-file runs (default),
    *  'watcher:ci' for GitHub-Actions-sourced runs — lets a reader tell local vs. remote signal
    *  apart without inspecting payload shape. */
   source?: string
-  /** dedup_key namespace prefix (directive-128). Defaults to 'test', matching every dedup key
+  /** dedup_key namespace prefix. Defaults to 'test', matching every dedup key
    *  recorded before CI polling existed — unchanged for existing callers. CI-sourced signals use
    *  'ci' so a CI run's numeric id can never collide with a local run's `<path>:<mtime>` id even
    *  in the (currently impossible) case they'd otherwise coincide. */
@@ -45,7 +45,7 @@ export async function handleTestSignal(
       failedTests: signal.failedTests,
       runId: signal.runId,
     },
-    // Namespaced by repo, same reasoning as handleGitSignal (directive-27).
+    // Namespaced by repo, same reasoning as handleGitSignal.
     dedupKey: `${dedupPrefix}:${signal.repo}:${signal.branch}:${signal.runId}`,
   })
 
@@ -61,13 +61,13 @@ export async function handleGitSignal(signal: GitSignal): Promise<{ duplicate: b
     kind: signal.event === 'commit' ? 'git.commit' : 'git.branch',
     source: 'watcher:git',
     payload: { repo: signal.repo, branch: signal.branch, sha: signal.sha },
-    // Namespaced by repo (directive-27): shas are already effectively unique across independent
+    // Namespaced by repo: shas are already effectively unique across independent
     // repos, so this isn't fixing a real collision — it removes even the theoretical case and
     // makes the events table self-describing without a join back to a repo-path config.
     dedupKey: `git:${signal.event}:${signal.repo}:${signal.sha}`,
   })
 
-  // directive-18 addendum: a commit is the closest thing Bion already observes to "Kov just did
+  // A commit is the closest thing Bion already observes to "Kov just did
   // a turn" — the trigger the collector was missing. Best-effort, same posture as
   // recordDesktopCostSafely: a scan failure must never affect the git-signal path. Skipped on a
   // duplicate signal (already-seen commit) so a re-run doesn't do redundant work.

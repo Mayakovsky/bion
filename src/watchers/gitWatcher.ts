@@ -2,8 +2,8 @@ import { execFileSync } from 'node:child_process'
 import type { GitSignal } from './types.js'
 import { handleGitSignal } from './handler.js'
 
-// Git watcher: emits a signal for a commit or branch event over any watched repo (directive-27 —
-// was bion-only/dogfood; now multi-repo). Reactive dispatch does not trigger on git events in this
+// Git watcher: emits a signal for a commit or branch event over any watched repo (was
+// bion-only/dogfood; now multi-repo). Reactive dispatch does not trigger on git events in this
 // cut — the git watcher only records events (extensible later). Real collection via readGitHead();
 // tests construct signals directly.
 

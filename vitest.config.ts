@@ -8,7 +8,7 @@ export default defineConfig({
     globalSetup: ['test/globalSetup.ts'],
     // testEnv.ts first: forces BION_DATABASE_URL/BION_MIGRATE_URL to .env.test's bion_test
     // before test/setup.ts (which imports src/db/pool.js -> src/env.js) can lock in .env.local's
-    // values (directive-23 Part A).
+    // values.
     setupFiles: ['test/testEnv.ts', 'test/setup.ts'],
     fileParallelism: false,
     pool: 'forks',

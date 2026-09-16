@@ -1,4 +1,4 @@
-// Task-dependency DAG enforcement (spec §4, inv 14).
+// Task-dependency DAG enforcement (inv 14).
 // Edge semantics: an edge id -> dep means "task `id` depends on `dep`".
 // A cycle among those edges is rejected.
 

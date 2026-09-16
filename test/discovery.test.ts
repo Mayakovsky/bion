@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { discoverRepos } from '../src/index.js'
 
-// discoverRepos() coverage (directive-68) — replaces the GREY_REPO_PATH/static-list pattern with
+// discoverRepos() coverage — replaces the GREY_REPO_PATH/static-list pattern with
 // dev-root-wide auto-discovery. A bare `.git` directory (no real git init) is enough here: the
 // function only checks for its existence, never runs git against it.
 
@@ -36,7 +36,7 @@ describe('discoverRepos — flat and nested shapes', () => {
   })
 })
 
-describe('discoverRepos — multi-nested-repo shape (directive-68 addendum, eliza-shaped)', () => {
+describe('discoverRepos — multi-nested-repo shape (eliza-shaped)', () => {
   it('a single nested repo keeps the top-level-name convention unchanged (bion regression)', () => {
     const devRoot = freshDevRoot()
     makeNestedRepo(devRoot, 'bion')

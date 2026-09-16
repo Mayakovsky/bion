@@ -23,7 +23,7 @@ async function connectedClient() {
   return { client, server }
 }
 
-describe('desktop mail MCP server (directive-73 Task 2)', () => {
+describe('desktop mail MCP server', () => {
   let root: string
   const origMailRoot = process.env.BION_MAIL_ROOT
 
@@ -109,10 +109,10 @@ describe('desktop mail MCP server (directive-73 Task 2)', () => {
     expect(mailboxRoot()).toBe(root)
   })
 
-  // directive-154: the real gap D-153 found — send_mail's schema had no `project` field, so every
+  // A real gap once found: send_mail's schema had no `project` field, so every
   // Desktop-originated send landed unscoped by omission regardless of intent. These prove the fix
   // through the actual MCP protocol boundary (in-memory client<->server, real tool call), not by
-  // calling sendMail() directly — that path was already proven in D-150.
+  // calling sendMail() directly — that path was already proven separately.
   it('send_mail with project set lands in the real per-project subfolder, through the MCP path', async () => {
     const { client } = await connectedClient()
     // thread carries a fresh token each run — without it, identical literal content across two
@@ -125,7 +125,7 @@ describe('desktop mail MCP server (directive-73 Task 2)', () => {
         recipient: 'kov',
         intent: 'status',
         fields: { topic: 'mcp-project-test' },
-        note: 'directive-154 mcp project round trip',
+        note: 'mcp project round trip',
         project: 'scratch-d154-mcp',
         thread: `t-d154-project-${randomUUID()}`,
       },

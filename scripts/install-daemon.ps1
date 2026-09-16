@@ -4,7 +4,7 @@
 # (nssm/sc would), and restarts Bion across logout/restart on the next logon. Local-while-machine-is-up
 # is the accepted posture (always-on relocation still deferred, Q4).
 #
-# ONE task is sufficient (directive-08): the daemon ensures the :5433 cluster is up on start
+# ONE task is sufficient: the daemon ensures the :5433 cluster is up on start
 # (start-if-down + connect with backoff), so there is no cross-task ordering to sequence.
 #
 # Usage:  powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install-daemon.ps1

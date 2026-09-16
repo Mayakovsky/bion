@@ -11,11 +11,11 @@ import type { AgentAdapter } from '../adapters/types.js'
 import type { Task } from '../core/types.js'
 import type { TestSignal } from '../watchers/types.js'
 
-// Reactive dispatch — BUILT NOW, SHIPPED OFF (Phase D2). The full path exists; the flip
+// Reactive dispatch — BUILT NOW, SHIPPED OFF. The full path exists; the flip
 // off → shadow → on is a config change and Forces' call, informed by shadow data.
 //
 //  off / surface (default live behavior): failure → auto-create an UNRATIFIED task + notify Forces
-//                 + queue Desktop review. No dispatch (consistent with FDQ-B3).
+//                 + queue Desktop review. No dispatch (consistent with the auto-wake invariant).
 //  shadow:        as surface, plus log the dispatch it WOULD have fired (task/branch/trigger) + notify.
 //  on:            auto-dispatch to Kov within a BOUNDED envelope — only a failure on a ratified
 //                 task's own feature branch; circuit breaker (max N / window); loop-halt (a repeat
@@ -66,13 +66,13 @@ export interface ReactiveOutcome {
   notified?: NotifyResult
 }
 
-/** A branch `bion/<taskId>` maps to task `<taskId>` (feature-branch convention). Fallback only
- *  (directive-91) — kept exactly as it worked before, for bion's own already-working branches. */
+/** A branch `bion/<taskId>` maps to task `<taskId>` (feature-branch convention). Fallback only —
+ *  kept exactly as it worked before, for bion's own already-working branches. */
 function taskIdFromBranch(branch: string): string | null {
   return branch.startsWith(FEATURE_PREFIX) ? branch.slice(FEATURE_PREFIX.length) : null
 }
 
-/** Explicit binding first (directive-91) — real lookup by the `branch` column a task was bound
+/** Explicit binding first — real lookup by the `branch` column a task was bound
  *  to via `bindBranch()`, not a guess from the branch string. This is what makes reactive dispatch
  *  usable on repos like `grey`, whose branches never follow bion's own `bion/<taskId>` naming
  *  culture. Falls back to the string-match convention only when no explicit binding exists, so

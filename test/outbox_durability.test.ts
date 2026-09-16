@@ -21,7 +21,7 @@ import {
 const freshRoot = () => join(tmpdir(), `bion-mail-${randomUUID()}`)
 
 // Gate D1: inject a crash at each seam; assert the reconciler completes the action EXACTLY ONCE.
-describe('transactional outbox durability (FDQ-B7 + rename-window)', () => {
+describe('transactional outbox durability (rename-window)', () => {
   it('seam 1 — crash after row-commit / before publish: reconciler publishes exactly once', async () => {
     const root = freshRoot()
     const body = `d1-seam1 ${randomUUID()}`

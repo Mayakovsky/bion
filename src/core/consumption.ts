@@ -2,7 +2,7 @@ import { pool, type Executor } from '../db/pool.js'
 import { dedupKey } from './ids.js'
 import type { Message } from './types.js'
 
-// DB-as-routing-authority (spec §5, inv 12): an agent may act on a packet ONLY if its
+// DB-as-routing-authority (inv 12): an agent may act on a packet ONLY if its
 // content_sha256 matches an UNCONSUMED messages row addressed to it. The mailbox is payload.
 
 /** Find an unconsumed message for `recipient` whose content hash matches the packet. */

@@ -11,10 +11,10 @@ const REVENUE_TABLES = [
   'grey_two',
 ]
 
-// Plane-boundary is a credential boundary (spec §3.1). These assertions prove the runtime
+// Plane-boundary is a credential boundary. These assertions prove the runtime
 // role resolves ONLY to the local, isolated bion DB with no path to the revenue plane.
 describe('plane isolation', () => {
-  // Under `vitest run` this resolves to bion_test, not bion (directive-23 Part A test isolation)
+  // Under `vitest run` this resolves to bion_test, not bion (test isolation)
   // — same cluster/port/role, isolated database.
   it('BION_DATABASE_URL points only at the local bion(_test) DB as bion_rw', () => {
     const u = parseDbUrl(env.databaseUrl)
@@ -46,7 +46,7 @@ describe('plane isolation', () => {
   })
 })
 
-// inv 13 / directive-01 ruling 3: Bion (bion_rw) can never set tasks.ratified.
+// inv 13: Bion (bion_rw) can never set tasks.ratified.
 describe('ratification is Forces-gated at the credential level', () => {
   it('new tasks default to ratified=false', async () => {
     const id = `t-${randomUUID()}`

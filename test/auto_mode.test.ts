@@ -46,7 +46,7 @@ async function cleanupRatifiedTask(t: { id: string; project: string }): Promise<
   await deleteProjectAsForces(t.project)
 }
 
-describe('Auto Mode default posture (directive-20: off -> shadow)', () => {
+describe('Auto Mode default posture (off -> shadow)', () => {
   it('autoModeSetting() falls back to shadow when BION_AUTO_MODE is fully unset', () => {
     const had = 'BION_AUTO_MODE' in process.env
     const prior = process.env.BION_AUTO_MODE
@@ -72,7 +72,7 @@ describe('Auto Mode default posture (directive-20: off -> shadow)', () => {
   })
 })
 
-describe('BION_AUTO_SCOPE task-scope filter (directive-23 Part B)', () => {
+describe('BION_AUTO_SCOPE task-scope filter', () => {
   it('unset: selects the front task exactly as today, unfiltered', async () => {
     const had = 'BION_AUTO_SCOPE' in process.env
     const prior = process.env.BION_AUTO_SCOPE
@@ -130,7 +130,7 @@ describe('BION_AUTO_SCOPE task-scope filter (directive-23 Part B)', () => {
   })
 })
 
-describe('Terminal `superseded` status (directive-126)', () => {
+describe('Terminal `superseded` status', () => {
   it('excluded from selectAutoWork() identically to blocked', async () => {
     const task = await ratifiedTaskInTopProject()
     try {

@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { KovAdapter, writePacket, query, sha256 } from '../src/index.js'
 
-// Gate B: a forged/unmatched packet is refused (spec §5, inv 12). The DB is routing authority;
+// Gate B: a forged/unmatched packet is refused (inv 12). The DB is routing authority;
 // a file with no matching UNCONSUMED row cannot dispatch the agent.
 describe('DB-as-routing-authority refuses unmatched/forged packets', () => {
   it('a packet with no matching DB row is flagged, not consumed', async () => {

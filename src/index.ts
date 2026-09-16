@@ -1,4 +1,4 @@
-// Bion — coordination primitives (spec §3.3) + state helpers.
+// Bion — coordination primitives + state helpers.
 export { record } from './core/record.js'
 export { send } from './core/send.js'
 export { recordEvent } from './core/events.js'

@@ -19,7 +19,7 @@ describe('ntfy notifier (auth header only, never in logs — inv 9)', () => {
     )
     expect(r).toEqual({ sent: true, dryRun: false, status: 200 })
     const headers = captured[0]!.init.headers as Record<string, string>
-    expect(headers.Authorization).toBeUndefined() // secured by topic-name obscurity only (FDQ-B14)
+    expect(headers.Authorization).toBeUndefined() // secured by topic-name obscurity only (a tracked open question)
     expect(headers.Title).toBe('anon')
   })
 

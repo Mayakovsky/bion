@@ -12,7 +12,7 @@ export interface HandoffPacket {
 
 /**
  * handoff(target_agent) — summarize recent Bion state into a handoff packet formatted for
- * the next agent (spec §3.3). Phase A returns the markdown; Phase B routes it via the mailbox.
+ * the next agent. First it returns the markdown; then it routes it via the mailbox.
  */
 export async function handoff(target: string, opts: HandoffOptions = {}): Promise<HandoffPacket> {
   const nDec = opts.recentDecisions ?? 5

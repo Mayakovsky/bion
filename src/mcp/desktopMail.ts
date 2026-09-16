@@ -7,12 +7,12 @@ import { sendMail, pollMail, formatPollResult } from '../cli/mail.js'
 import { isValidProjectName, RESERVED_BOX_NAMES } from '../mailbox/mailbox.js'
 import { closePool } from '../db/pool.js'
 
-// Desktop mail MCP server (directive-73 Task 2). Desktop's own general-purpose `bion-postgres`
+// Desktop mail MCP server. Desktop's own general-purpose `bion-postgres`
 // connector is read-only at the client/tool level (confirmed empirically — it refuses non-SELECT
 // SQL regardless of the DB role's actual grants), so Desktop can't consume or send mail through it.
 // The fix is not "make that connector read-write" (a much bigger surface than the actual need) —
 // it's this: a small, purpose-built stdio server exposing exactly the two operations Desktop
-// needs, as thin wrappers over D-71's already-built, already-tested sendMail()/pollMail()
+// needs, as thin wrappers over the already-built, already-tested sendMail()/pollMail()
 // (src/cli/mail.ts). No mailbox logic lives here.
 //
 // Runs on the real machine (unlike Desktop's sandbox), so it reuses BION_DATABASE_URL/bion_rw —
@@ -32,7 +32,7 @@ const SEND_MAIL_INPUT = {
     .string()
     .optional()
     .describe(
-      'Mailbox scoping (directive-146/150/154) — same shape as `bion mail send --project`. Omitted → unscoped (the historical flat shape).',
+      'Mailbox scoping — same shape as `bion mail send --project`. Omitted → unscoped (the historical flat shape).',
     ),
 }
 

@@ -5,9 +5,10 @@ import type { TestSignal } from './types.js'
 import { handleTestSignal } from './handler.js'
 import type { ReactiveDeps } from '../loop/reactive.js'
 
-// GitHub Actions CI watcher (directive-128) — closes the gap D-125's Task 3 found: real CI
+// GitHub Actions CI watcher — closes a real gap: real CI
 // failures (the 8/17 test/env.test.ts ones) were structurally invisible, since testWatcher.ts
-// only ever watches the local filesystem. Polling, not a webhook (design spec §3.2 — Bion is
+// only ever watches the local filesystem. Polling, not a webhook (the original design's own
+// framing: Bion is
 // "closer to a scheduler than a participant"; every existing watcher is pull-based; a webhook
 // would mean a new exposed network endpoint this project has never needed anywhere else).
 // Reuses the existing pipeline rather than building a parallel one: normalizes a GH Actions run
@@ -51,7 +52,7 @@ interface GhJob {
 }
 
 /** Resolve a repo's real `owner/repo` GitHub slug from its actual `origin` remote — no hardcoded
- *  repo list, so a newly auto-discovered repo (discovery.ts, directive-68) is covered for free.
+ *  repo list, so a newly auto-discovered repo (discovery.ts) is covered for free.
  *  Returns null for a non-GitHub or missing remote (nothing to poll, not an error). */
 export async function resolveGhSlug(repoPath: string): Promise<string | null> {
   try {

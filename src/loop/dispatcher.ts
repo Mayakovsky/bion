@@ -4,7 +4,7 @@ import { pointer, serialize } from '../comms/protocol.js'
 import type { AgentAdapter, DispatchResult } from '../adapters/types.js'
 import type { Task } from '../core/types.js'
 
-// Dispatcher — pulls from the RATIFIED backlog only (auto-wake envelope, FDQ-B3 / inv 13),
+// Dispatcher — pulls from the RATIFIED backlog only (auto-wake envelope / inv 13),
 // respects DAG dependencies (a task is dispatchable only when every dependency is 'done'),
 // and assigns work to Kov. It never dispatches outside ratified movement scope.
 

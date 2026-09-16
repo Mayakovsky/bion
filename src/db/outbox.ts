@@ -4,12 +4,12 @@ import { isConsumed } from '../core/consumption.js'
 import { publishBodyToPath } from '../mailbox/mailbox.js'
 import { notifyForces, type NotifyFn, type NotifyInput, type NotifyResult } from '../notify/ntfy.js'
 
-// Transactional outbox (Phase D1). Callers write a state row AND an outbox entry in ONE
+// Transactional outbox. Callers write a state row AND an outbox entry in ONE
 // transaction (enqueueOutbox on the tx client); a drainer/reconciler performs the side effect and
 // marks the entry done. Every committed intent survives a crash at any point, with these guarantees:
 //   - publish : EXACTLY-ONCE  (idempotent place + status-independent repairPublishes)
 //   - notify  : AT-LEAST-ONCE (claim→'sending', send, then 'done'; a crash mid-send re-sends on
-//               reconcile — a duplicate ntfy to a human is harmless, a lost one is not; directive-04)
+//               reconcile — a duplicate ntfy to a human is harmless, a lost one is not)
 
 export type OutboxKind = 'publish' | 'notify'
 
@@ -177,7 +177,7 @@ export async function reconcile(deps: DrainDeps = {}): Promise<DrainResult & { r
 /**
  * Durably send a notification: persist a notify-intent to the outbox (idempotent on dedupKey), then
  * drain. If the process dies before the send, the reconciler re-sends it (at-least-once). Used to
- * give reactive/watcher notifications the same durability as completion notifications (FDQ-B10).
+ * give reactive/watcher notifications the same durability as completion notifications.
  */
 export async function notifyDurably(
   payload: NotifyPayload,

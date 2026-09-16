@@ -13,7 +13,7 @@ import type { AgentAdapter, PollResult } from '../adapters/types.js'
 import type { Task } from '../core/types.js'
 import { checkUsage, type UsageDeps } from './usage.js'
 
-// Auto Mode (Phase E3) — BUILT NOW, SHIPPED OFF (BION_AUTO_MODE default off; the flip is Forces').
+// Auto Mode — BUILT NOW, SHIPPED OFF (BION_AUTO_MODE default off; the flip is Forces').
 //   off     do nothing (surface-only posture handled elsewhere).
 //   shadow  log the pivots + dispatches it WOULD make + notify; spends nothing, executes nothing.
 //   on      auto-dispatch ratified work to Kov (the unattended engine) within the reactive envelope;
@@ -21,8 +21,8 @@ import { checkUsage, type UsageDeps } from './usage.js'
 // Pivot-on-block: walk projects by ordinal, tasks by priority, skipping blocked work — so a
 // roadblock on one project advances the front to the next project's next ratified task.
 //
-// Directive-20: the unset/unrecognized fallback moved off -> shadow (Forces' explicit call, not a
-// bugfix — the "shipped off" posture above was Phase E3's original stance). `off` and `on` remain
+// The unset/unrecognized fallback moved off -> shadow (Forces' explicit call, not a
+// bugfix — "shipped off" was the original stance). `off` and `on` remain
 // fully available as explicit settings; this only changes what happens when nobody said anything.
 // `on` (real autonomous dispatch) is untouched — this is not a step toward defaulting to `on`.
 
@@ -38,7 +38,7 @@ export interface AutoWork {
   pivoted: boolean
 }
 
-/** BION_AUTO_SCOPE (directive-23 Part B): comma-separated task-id prefixes or exact ids that
+/** BION_AUTO_SCOPE: comma-separated task-id prefixes or exact ids that
  * bound a trial to a subset of ratified work. Unset/empty = no filter (current behavior). */
 function autoScopeFilter(): string | undefined {
   return process.env.BION_AUTO_SCOPE?.trim() || undefined
@@ -173,7 +173,7 @@ export async function runAutoStep(deps: AutoDeps): Promise<AutoOutcome> {
   return { mode, selected, dispatched: true, notified }
 }
 
-/** Desktop auto-reads its inbox at session launch (spec §5; Auto Mode requirement). */
+/** Desktop auto-reads its inbox at session launch (an Auto Mode requirement). */
 export async function desktopLaunchRead(opts: { mailRoot?: string } = {}): Promise<PollResult> {
   return new DesktopAdapter({ mailRoot: opts.mailRoot }).pollStatus()
 }

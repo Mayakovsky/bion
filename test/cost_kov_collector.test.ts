@@ -35,7 +35,7 @@ function usageLine(opts: {
   })
 }
 
-// Gate: the one place a silent bug double-counts real numbers (directive-18 §Section A/5).
+// Gate: the one place a silent bug double-counts real numbers.
 describe('kov cost collector — real per-turn tokens from Claude Code JSONL', () => {
   it('dedups duplicate content-block lines sharing one requestId, and a re-scan is a no-op', async () => {
     const root = freshRoot()

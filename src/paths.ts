@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 
 // Resolve Bion paths relative to the REPO ROOT (derived from this module's own location), never
 // process.cwd() — so state loads identically whether launched from a shell or Task Scheduler, from
-// any working directory (directive-11). The repo root is found by walking up to the nearest
+// any working directory. The repo root is found by walking up to the nearest
 // package.json, which is stable regardless of where this file sits in the build output (src/ or dist/).
 
 let cached: string | null = null

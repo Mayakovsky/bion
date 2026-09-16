@@ -2,7 +2,7 @@
 # create-project.sh — OWNER LANE. Insert (or reactivate) a row in `projects`.
 #
 # bion_rw only has SELECT on `projects` (migration 0006) — registering a project is structurally
-# outside the runtime role's authority, same posture as ratification (directive-01, inv 13).
+# outside the runtime role's authority, same posture as ratification (inv 13).
 # Idempotent: re-running with a new ordinal updates it and reactivates the project.
 #
 # Usage: BION_MIGRATE_URL=... bash scripts/create-project.sh <id> <ordinal>

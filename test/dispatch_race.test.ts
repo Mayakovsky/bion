@@ -4,14 +4,14 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { KovAdapter, stagePacket, publishStaged, listBox, send } from '../src/index.js'
 
-// FDQ-B8 regression: a packet must never be observable in unread/ before its authoritative row is
+// Regression: a packet must never be observable in unread/ before its authoritative row is
 // committed. Pre-fix, dispatch() published to unread/ before send() committed, so a poll in that
 // window false-quarantined a legit packet.
 function freshRoot(): string {
   return join(tmpdir(), `bion-mail-${randomUUID()}`)
 }
 
-describe('FDQ-B8 — dispatch ordering race', () => {
+describe('dispatch ordering race', () => {
   it('a packet becomes visible in unread/ only after its row exists; in-window poll quarantines nothing', async () => {
     const root = freshRoot()
     const kov = new KovAdapter({ mailRoot: root })

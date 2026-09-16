@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
 import { query, closePool } from '../db/pool.js'
 
-// `bion auto-report` (directive-19) — read-only console surface, sibling to `bion status`/`bion cost`.
+// `bion auto-report` — read-only console surface, sibling to `bion status`/`bion cost`.
 // Reads events WHERE kind = 'auto.shadow' only, for now — auto.dispatch/auto.halt have a different
 // payload shape and matter once `on` mode is live for real, not before.
 //

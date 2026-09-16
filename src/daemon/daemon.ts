@@ -16,11 +16,11 @@ import { acquireLock, releaseLock, pidfilePath } from './lock.js'
 import { heartbeatPath, writeHeartbeat, type Heartbeat } from './heartbeat.js'
 import { env } from '../env.js'
 
-// Persistent daemon (Phase E1) — makes Bion a live process so the outbox, watchers, and (later)
-// the Auto Mode loop actually run. Local-while-machine-is-up is the accepted posture (B9); the
+// Persistent daemon — makes Bion a live process so the outbox, watchers, and (later)
+// the Auto Mode loop actually run. Local-while-machine-is-up is the accepted posture; the
 // scheduled-task-at-logon mechanism (scripts/install-daemon.ps1) restarts it across logout/restart.
 //
-// SAFE BY DEFAULT: with BION_AUTO_MODE unset/shadow (directive-20) it logs would-dispatch and fires
+// SAFE BY DEFAULT: with BION_AUTO_MODE unset/shadow it logs would-dispatch and fires
 // nothing; with BION_REACTIVE_DISPATCH at shadow the reactive path only logs. The tick just drains
 // durable side effects + heartbeats.
 
@@ -30,11 +30,11 @@ export interface DaemonOptions {
   reconcileOnStart?: boolean
   /** Poll git HEAD each tick and emit a commit signal (live watcher). Default true. */
   watchGit?: boolean
-  /** Poll for vitest JSON result files each tick and emit a test signal (live watcher,
-   *  directive-27 Task 2). Default true. */
+  /** Poll for vitest JSON result files each tick and emit a test signal (live watcher).
+   *  Default true. */
   watchTests?: boolean
   /** Poll GitHub Actions for each watched repo's CI runs (rate-limited internally, not every
-   *  tick — directive-128). Default true. */
+   *  tick). Default true. */
   watchCI?: boolean
   /** Override CIWatcher's per-repo poll interval (tests use a tiny value; default 5 min). */
   ciPollIntervalMs?: number
@@ -50,8 +50,8 @@ export interface DaemonOptions {
 }
 
 // Live git watcher: emit a commit signal when a watched repo's HEAD moves. Idempotent by sha per
-// repo; gitPollState avoids a DB round-trip every tick. Dev-root-wide auto-discovery (directive-68,
-// replaces directive-27's bion+GREY_REPO_PATH static list): every repo discoverRepos() finds under
+// repo; gitPollState avoids a DB round-trip every tick. Dev-root-wide auto-discovery (replaces
+// the old bion+GREY_REPO_PATH static list): every repo discoverRepos() finds under
 // env.devRoot, re-discovered each tick so a repo added mid-run is picked up without a restart.
 const gitPollState = createGitPollState()
 const testPollState = createTestPollState()
@@ -86,9 +86,9 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
 /** Run the daemon loop until SIGINT/SIGTERM. */
 export async function runDaemon(opts: DaemonOptions = {}): Promise<void> {
-  console.log('[daemon] runDaemon entered') // directive-13 step-1 trace
+  console.log('[daemon] runDaemon entered') // startup trace
 
-  // Single-instance lock (directive-15) FIRST — before touching anything. First-wins: a live
+  // Single-instance lock FIRST — before touching anything. First-wins: a live
   // incumbent is sacrosanct; we decline and exit 0 without a heartbeat/cluster/reconcile/DB write.
   const lockPath = opts.pidfile ?? pidfilePath()
   const lock = acquireLock(lockPath)
@@ -106,7 +106,7 @@ export async function runDaemon(opts: DaemonOptions = {}): Promise<void> {
   process.on('SIGINT', stop)
   process.on('SIGTERM', stop)
 
-  // Close the post-reboot persistence gap: bring the cluster up before the DB is needed (directive-08).
+  // Close the post-reboot persistence gap: bring the cluster up before the DB is needed.
   if (opts.cluster !== false) {
     try {
       const r = await ensureClusterUp(opts.cluster || {})
@@ -125,7 +125,7 @@ export async function runDaemon(opts: DaemonOptions = {}): Promise<void> {
     payload: { pid: process.pid, reactive: reactiveMode(), auto: autoModeSetting() },
     dedupKey: `daemon.start:${process.pid}:${startedAt}`,
   })
-  // Ping Forces so a successful launch is observable on the phone, not just in the DB (directive-11).
+  // Ping Forces so a successful launch is observable on the phone, not just in the DB.
   // Durable + at-least-once; dry-run (no ping) when BION_NTFY_URL is unset. Non-fatal on failure.
   await notifyDurably(
     {
@@ -158,7 +158,7 @@ export async function runDaemon(opts: DaemonOptions = {}): Promise<void> {
 }
 
 const isMain = !!process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))
-console.log('[daemon] module loaded, isMain=', isMain) // directive-13 step-1 trace
+console.log('[daemon] module loaded, isMain=', isMain) // startup trace
 if (isMain) {
   // Real daemon: each tick also runs usage check + one Auto Mode step (default shadow: logs, no dispatch).
   const { autoTick } = await import('../auto/autoMode.js')

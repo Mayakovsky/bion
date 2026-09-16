@@ -7,7 +7,7 @@ import { DesktopAdapter } from '../adapters/desktop.js'
 import { isValidProjectName, RESERVED_BOX_NAMES } from '../mailbox/mailbox.js'
 import type { AgentAdapter, DispatchResult, PollResult } from '../adapters/types.js'
 
-// `bion mail send` / `bion mail poll` (directive-71) — CLI over the mailbox that already exists
+// `bion mail send` / `bion mail poll` — CLI over the mailbox that already exists
 // (src/mailbox/mailbox.ts, src/adapters/*.ts). Same argv-parsing approach as `bion task`
 // (src/cli/task.ts): `--flag value` pairs, bare `--flag` reads as 'true', everything else positional.
 // `--field k=v` is repeatable and collects into a fields map (task.ts's flags are single-value only).
@@ -56,7 +56,7 @@ export interface SendArgs {
   thread?: string
   type?: string
   summary?: string
-  /** Mailbox scoping (directive-146/150, FDQ-B2). Omitted → unscoped, the historical flat shape. */
+  /** Mailbox scoping. Omitted → unscoped, the historical flat shape. */
   project?: string
 }
 

@@ -32,7 +32,7 @@ const failSig = (branch: string, runId: string) => ({
   runId,
 })
 
-describe('bindBranch (directive-91 Task 3 — the real binding mechanism)', () => {
+describe('bindBranch (the real binding mechanism)', () => {
   it('binds a ratified task to an arbitrary, non-bion/-prefixed branch', async () => {
     const taskId = `bb-${randomUUID()}`
     await createTask({ id: taskId, title: 'grey-repo work' })

@@ -11,11 +11,11 @@ export interface SendInput {
   thread?: string
   type?: string
   summary?: string
-  /** Disk path of the packet; set by the mailbox layer (Phase B). */
+  /** Disk path of the packet; set by the mailbox layer. */
   bodyPath?: string
   /** Explicit dedup key; defaults to a stable hash of the routing identity + content. */
   dedupKey?: string
-  /** Mailbox scoping (directive-146/150, FDQ-B2). Omitted/undefined → NULL (unscoped). */
+  /** Mailbox scoping. Omitted/undefined → NULL (unscoped). */
   project?: string
 }
 
@@ -27,8 +27,8 @@ export interface SendResult {
 
 /**
  * send(packet, recipient) — register a routed message in Bion state (the DB is the routing
- * authority, §5). Idempotent on dedup_key. In Phase A this records the row + content hash;
- * the disk mailbox write is layered on in Phase B.
+ * authority). Idempotent on dedup_key. This records the row + content hash;
+ * the disk mailbox write is layered on separately.
  */
 export async function send(input: SendInput, exec: Executor = pool()): Promise<SendResult> {
   const contentSha = sha256(input.body)

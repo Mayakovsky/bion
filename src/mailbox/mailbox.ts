@@ -4,14 +4,14 @@ import { dirname, join } from 'node:path'
 import { repoPath } from '../paths.js'
 
 // Disk mailbox: .bion/mail/<recipient>/{unread,read,flagged}/ — append-only markdown packets
-// (the historical, "unscoped" shape — every packet sent before directive-146/150, and any new
+// (the historical, "unscoped" shape — every packet sent before per-project scoping existed, and any new
 // packet sent without a project). Newer packets additionally support per-project scoping:
-// .bion/mail/<recipient>/<project>/{unread,read,flagged}/ (directive-146/150, FDQ-B2). Both shapes
+// .bion/mail/<recipient>/<project>/{unread,read,flagged}/. Both shapes
 // are read simultaneously (see listBox) — the historical ~197 packets are deliberately left in
-// place, never migrated (see BION-DIRECTIVE-146-ITEM5-MAILBOX-SCOPING-PROPOSAL.md's Question 3).
+// place, never migrated (a deliberate call recorded internally, not an oversight).
 //
 // Writes are atomic: staged in .tmp/ then renamed into unread/ (rename is atomic on one volume),
-// so a reader never observes a partial packet (spec §5, Gate B).
+// so a reader never observes a partial packet (Gate B).
 
 export type Box = 'unread' | 'read' | 'flagged'
 
@@ -29,7 +29,7 @@ export function isValidProjectName(name: string): boolean {
 export function mailboxRoot(root?: string): string {
   // `||`, not `??`: BaseAdapter defaults its unset mailRoot to '' (the field is typed non-optional
   // string), and listBox()/boxDir() coerce a missing root to '' too — an empty string must fall
-  // through to the real defaults, not be taken as "root is the cwd" (directive-71 Task 3 finding:
+  // through to the real defaults, not be taken as "root is the cwd" (a real bug found once:
   // this was landing real packets in a bare ./<recipient>/unread/ instead of .bion/mail/…).
   return root || process.env.BION_MAIL_ROOT || repoPath('.bion', 'mail')
 }
@@ -67,9 +67,9 @@ export interface StagedPacket {
 /**
  * Stage a packet to .tmp/ WITHOUT publishing it. The payload exists on disk but is invisible to
  * readers scanning unread/. Callers publish it (publishStaged) only AFTER the authoritative DB row
- * is committed — so a packet is never observable in unread/ before its row exists (FDQ-B8).
+ * is committed — so a packet is never observable in unread/ before its row exists.
  *
- * `opts.project` (directive-146/150): scope the write into `<recipient>/<project>/…` instead of
+ * `opts.project`: scope the write into `<recipient>/<project>/…` instead of
  * the flat `<recipient>/…`. Omitted → the historical flat shape, unchanged.
  */
 export function stagePacket(
@@ -138,7 +138,7 @@ function listMd(dir: string): string[] {
 }
 
 /**
- * List every packet in `box` across BOTH mailbox shapes (directive-146/150):
+ * List every packet in `box` across BOTH mailbox shapes:
  *  1. The historical flat shape, `<root>/<recipient>/<box>/` — every packet ever sent before this
  *     change, permanently, with zero data movement.
  *  2. Every per-project subdirectory, `<root>/<recipient>/<project>/<box>/` — any real project name

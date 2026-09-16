@@ -20,7 +20,7 @@ function findTask(d: Awaited<ReturnType<typeof collectAutoReport>>, taskId: stri
   return d.tasks.find((t) => t.taskId === taskId)
 }
 
-// directive-19 §4: aggregate view + distinct-task list over auto.shadow, at all-time/24h/30d.
+// Aggregate view + distinct-task list over auto.shadow, at all-time/24h/30d.
 describe('bion auto-report', () => {
   it('aggregates total, by-project, by-owner, and pivoted count at the all-time scale', async () => {
     const project = `proj-${randomUUID().slice(0, 8)}`

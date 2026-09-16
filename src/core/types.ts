@@ -1,4 +1,4 @@
-// Row shapes mirroring the data model (spec §4). Timestamps come back as Date from pg.
+// Row shapes mirroring the data model. Timestamps come back as Date from pg.
 
 export interface Message {
   id: string
@@ -12,7 +12,7 @@ export interface Message {
   content_sha256: string
   dedup_key: string
   origin: string
-  /** Mailbox scoping (directive-146/150, FDQ-B2). Null = unscoped (historical + unlabeled new mail). */
+  /** Mailbox scoping. Null = unscoped (historical + unlabeled new mail). */
   project: string | null
 }
 
@@ -26,7 +26,7 @@ export interface Task {
   dependencies: string[]
   ratified: boolean
   project: string | null
-  /** Explicit task↔branch binding (directive-91) — set when real work begins. Nullable. */
+  /** Explicit task↔branch binding — set when real work begins. Nullable. */
   branch: string | null
   created: Date
   updated: Date
@@ -67,7 +67,7 @@ export interface Agent {
   authority: Record<string, unknown>
 }
 
-/** Which agent seat a cost-bearing event's tokens belong to (directive-18). */
+/** Which agent seat a cost-bearing event's tokens belong to. */
 export type CostSeat = 'kov' | 'desktop'
 
 export interface BionEvent {
@@ -77,7 +77,7 @@ export interface BionEvent {
   payload: Record<string, unknown>
   source: string
   dedup_key: string
-  /** Cost attribution (directive-18) — null on non-cost events. */
+  /** Cost attribution — null on non-cost events. */
   target_seat: CostSeat | null
   trigger_class: string | null
   model: string | null

@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { createTask, setTaskStatus, selectDispatchable, dispatchNext, KovAdapter } from '../src/index.js'
 import { ratifyAsForces, deleteTasksAsForces } from './helpers.js'
 
-describe('dispatcher respects the ratified envelope + DAG deps (FDQ-B3 / inv 14)', () => {
+describe('dispatcher respects the ratified envelope + DAG deps (inv 14)', () => {
   it('selects ratified tasks and never unratified ones', async () => {
     const ratified = `t-${randomUUID()}`
     const unratified = `t-${randomUUID()}`

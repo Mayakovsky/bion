@@ -4,7 +4,7 @@ import type { AgentAdapter } from '../adapters/types.js'
 
 // Coordinator — thin composition of the event loop's moving parts (dispatcher + state monitor
 // + notifier). The loop is hands-free UP TO the gate: dispatch and state updates proceed
-// autonomously; push/merge/tag/deploy/spend still stop at the Forces gate (spec §7, Gate C).
+// autonomously; push/merge/tag/deploy/spend still stop at the Forces gate (Gate C).
 
 export interface CoordinatorDeps {
   kov: AgentAdapter

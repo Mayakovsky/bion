@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { createTask, getTask, query } from '../src/index.js'
 import { runOwnerScript, deleteTasksAsForces, deleteProjectAsForces } from './helpers.js'
 
-// directive-19: owner-lane scripts, tested as the real artifacts (not a TS re-implementation of
+// Owner-lane scripts, tested as the real artifacts (not a TS re-implementation of
 // their SQL) — round-tripped against a scratch project + tasks.
 describe('scripts/create-project.sh + scripts/ratify-project.sh (owner lane)', () => {
   it('create-project.sh inserts a row the runtime role can read back', async () => {
@@ -52,7 +52,7 @@ describe('scripts/create-project.sh + scripts/ratify-project.sh (owner lane)', (
       expect(second).not.toContain(inProject1.id)
     } finally {
       // ratified tasks attached to an active project are exactly what selectAutoWork() selects —
-      // must not survive the test regardless of assertion outcome (directive-19 addendum).
+      // must not survive the test regardless of assertion outcome.
       await deleteTasksAsForces([inProject1.id, inProject2.id])
       await deleteProjectAsForces(projectId)
     }

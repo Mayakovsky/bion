@@ -1,4 +1,4 @@
-// Comms Protocol v1 (Phase E4) — messages are POINTERS, not payloads. An agent→agent message
+// Comms Protocol v1 — messages are POINTERS, not payloads. An agent→agent message
 // carries an intent, refs (addresses of the truth: paths/SHAs/task ids/diff ranges), the minimal
 // fields needed to act, and an OPTIONAL terse note (≤ ~20 words). Richness lives in files the
 // reader opens locally. Governance ledgers (decisions/FDQs/invariants) are exempt — they stay prose.

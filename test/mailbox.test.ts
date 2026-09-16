@@ -46,7 +46,7 @@ describe('mailbox atomic write (Gate B: no partial reads)', () => {
   })
 
   it('an empty-string root (BaseAdapter\'s unset default) falls through to the real default, not a bare relative path', () => {
-    // directive-71 Task 3 finding: mailboxRoot('') used to return '' literally (?? doesn't treat
+    // A real finding: mailboxRoot('') used to return '' literally (?? doesn't treat
     // '' as unset), so a bare `new KovAdapter()`/`new DesktopAdapter()` landed packets in
     // ./<recipient>/unread relative to cwd instead of .bion/mail/<recipient>/unread.
     expect(mailboxRoot('')).toBe(mailboxRoot(undefined))
@@ -54,7 +54,7 @@ describe('mailbox atomic write (Gate B: no partial reads)', () => {
   })
 })
 
-describe('mailbox per-project scoping, dual-shape (directive-146/150, FDQ-B2)', () => {
+describe('mailbox per-project scoping, dual-shape', () => {
   it('a project-scoped write lands under <recipient>/<project>/unread/, not the flat shape', () => {
     const root = freshRoot()
     const { path } = writePacket('kov', 'scoped body', { root, project: 'grey' })

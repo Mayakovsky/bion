@@ -7,7 +7,7 @@ export function resolveEnvPath(): string {
   return repoPath('.env.local')
 }
 
-// Load .env.local module-relative so it loads identically from any cwd (directive-11).
+// Load .env.local module-relative so it loads identically from any cwd.
 // Real env vars, if already set, take precedence (dotenv does not override by default).
 config({ path: resolveEnvPath() })
 
@@ -48,8 +48,8 @@ export const env = {
   },
   ntfyUrl: process.env.BION_NTFY_URL ?? '',
   ntfyToken: process.env.BION_NTFY_TOKEN ?? '',
-  /** Absolute path to the /dev root Bion auto-discovers watched repos under (directive-68,
-   *  replaces GREY_REPO_PATH). Default is derived, not hardcoded: repoRoot() is `.../dev/bion/repo`,
+  /** Absolute path to the /dev root Bion auto-discovers watched repos under (replaces the old
+   *  GREY_REPO_PATH). Default is derived, not hardcoded: repoRoot() is `.../dev/bion/repo`,
    *  so two levels up is `.../dev` — safe-by-default, overridable via BION_DEV_ROOT for tests or a
    *  differently-laid-out machine. */
   get devRoot(): string {

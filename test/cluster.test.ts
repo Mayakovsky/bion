@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { ensureClusterUp } from '../src/index.js'
 
-// directive-08: the daemon ensures the cluster is up. Unit-tested with injected probe/start so the
+// The daemon ensures the cluster is up. Unit-tested with injected probe/start so the
 // real cluster is never touched (other specs need it live).
 describe('ensureClusterUp (cluster autostart)', () => {
   it('no-ops when the cluster is already reachable', async () => {

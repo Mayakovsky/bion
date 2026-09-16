@@ -14,7 +14,7 @@ import {
   type ReactiveDeps,
 } from '../src/index.js'
 
-// Direct pollTests() coverage (directive-27 Task 2) — this watcher didn't exist for either repo
+// Direct pollTests() coverage — this watcher didn't exist for either repo
 // before this directive. Throwaway local git repos (pollTests reads branch via readGitHead, so
 // each fixture needs to actually be a git repo), real vitest-shaped JSON, not real bion/grey.
 

@@ -32,9 +32,9 @@ function usageLine(requestId: string): string {
   })
 }
 
-// directive-18 addendum: collectKovCost() was correct but never called from anywhere live.
+// collectKovCost() was correct but never called from anywhere live.
 // A commit signal is the wired-in trigger.
-describe('git commit signal triggers the kov cost collector (directive-18 addendum)', () => {
+describe('git commit signal triggers the kov cost collector', () => {
   it('a fresh commit signal scans Claude Code logs and records real cost.kov events', async () => {
     const root = freshRoot()
     const projDir = join(root, `proj-${randomUUID().slice(0, 8)}`)

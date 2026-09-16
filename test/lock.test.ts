@@ -13,7 +13,7 @@ function freshPidPath(): string {
 const alive = () => true
 const dead = () => false
 
-describe('single-instance lock (directive-15)', () => {
+describe('single-instance lock', () => {
   it('pidAlive: true for self, false for invalid pids', () => {
     expect(pidAlive(process.pid)).toBe(true)
     expect(pidAlive(0)).toBe(false)

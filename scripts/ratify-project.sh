@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ratify-project.sh — FORCES LANE. Batch-ratify every not-yet-ratified task in a project.
 #
-# Same posture and invariant as ratify-task.sh (directive-01 ruling 3; inv 13) — this is a
+# Same posture and invariant as ratify-task.sh (inv 13) — this is a
 # batching convenience for Forces, not a relaxation: the runtime role still cannot touch
 # `ratified` or `projects`. Bion never runs this itself.
 #

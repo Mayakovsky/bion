@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import pg from 'pg'
 import { env } from '../env.js'
 
-// Cluster autostart (directive-08) — the daemon ensures the dedicated :5433 cluster is up before it
+// Cluster autostart — the daemon ensures the dedicated :5433 cluster is up before it
 // needs it, so a single logon task (BionDaemon) is sufficient: no cross-task ordering. Starting the
 // user-owned cluster is NON-ADMIN (pg_ctl on the user's own data dir).
 

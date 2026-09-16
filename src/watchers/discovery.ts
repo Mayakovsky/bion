@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import type { RepoRef } from './gitWatcher.js'
 import { repoPath } from '../paths.js'
 
-// Dev-root-wide repo discovery (directive-68) — replaces the GREY_REPO_PATH/static-list pattern.
+// Dev-root-wide repo discovery — replaces the GREY_REPO_PATH/static-list pattern.
 // Auto-discovery is the default (Forces, 2026-08-14): any directory under the dev root with a
 // `.git` at itself or one level below (handles bion's own `repo/` nesting without special-casing
 // bion by name) is a watched repo, no per-repo opt-in. `.bion/bionignore` is the only deviation
@@ -62,7 +62,7 @@ export interface DiscoveryOptions {
  *  - no `.git` at its root, exactly one nested `.git` one level below → one `RepoRef`, still named
  *    after the top-level directory (bion's `repo/` nesting shape — unchanged from before this
  *    addendum, since real `git.commit` events already exist under dedup keys built from that name).
- *  - no `.git` at its root, MORE THAN ONE nested `.git` one level below (directive-68 addendum —
+ *  - no `.git` at its root, MORE THAN ONE nested `.git` one level below (a later addendum for
  *    `eliza`'s shape) → one `RepoRef` per nested repo, named `<top>/<nested>`, sorted alphabetically
  *    so the set is deterministic across runs/environments instead of picking whichever one
  *    `readdirSync` happened to return first.

@@ -1,7 +1,7 @@
 import { env } from '../env.js'
 
 // ntfy notifier — pushes human-decision-required events to Forces. Credentials travel via the
-// Authorization header ONLY and are never logged (inv 9 / FDQ-43). When BION_NTFY_URL is unset
+// Authorization header ONLY and are never logged (inv 9). When BION_NTFY_URL is unset
 // (placeholder), the notifier runs in dry-run mode so the loop is testable without live creds;
 // Forces supplies the live URL + token at deploy time.
 

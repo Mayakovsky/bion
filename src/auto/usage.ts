@@ -4,7 +4,7 @@ import { recordEvent } from '../core/events.js'
 import { notifyDurably } from '../db/outbox.js'
 import { notifyForces, type NotifyFn, type NotifyResult } from '../notify/ntfy.js'
 
-// Usage tracking (Phase E3) — session length, reset clock, usage; fire an ntfy warning at a
+// Usage tracking — session length, reset clock, usage; fire an ntfy warning at a
 // threshold (~80%). Bion doesn't natively know API usage, so it reads a snapshot an external
 // reporter writes to `.bion/usage.json`. The source's accuracy is flagged as an FDQ seed.
 

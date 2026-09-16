@@ -6,7 +6,7 @@ import type { QueryHit } from './types.js'
 
 export interface QueryStateOptions {
   limit?: number
-  /** Also grep the disk mailbox for the raw terms (spec §3.3). Default true. */
+  /** Also grep the disk mailbox for the raw terms. Default true. */
   grepDisk?: boolean
   mailboxRoot?: string
 }

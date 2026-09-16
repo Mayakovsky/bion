@@ -51,11 +51,11 @@ function reviewPacket(task: Task): string {
 }
 
 /**
- * Stage a completion durably (Phase D1): in ONE transaction, record the completion event, flip the
+ * Stage a completion durably: in ONE transaction, record the completion event, flip the
  * task to done, and enqueue BOTH outward intents — the ntfy to Forces AND the Desktop review packet
  * (as a routed messages row + a publish-outbox entry). Nothing is sent here; the drainer/reconciler
  * performs the side effects durably: the review packet exactly-once, the notification at-least-once
- * (dup-tolerant). A crash after this commit loses nothing (closes FDQ-B7).
+ * (dup-tolerant). A crash after this commit loses nothing.
  */
 export async function stageCompletion(
   taskId: string,
@@ -104,7 +104,7 @@ export async function stageCompletion(
   })
 
   // Best-effort, OUTSIDE the transaction: a cost-estimate failure must never re-open or block a
-  // completion that already committed (directive-18, same non-blocking rule as routePacket).
+  // completion that already committed (same non-blocking rule as routePacket).
   if (!result.duplicate && result.reviewMessageId) {
     await recordDesktopCostSafely({
       body: result.reviewBody!,

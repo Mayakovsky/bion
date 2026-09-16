@@ -50,7 +50,7 @@ jobs:
       # initdb'd local cluster (~/.bion-pg) — not a fit for CI's ephemeral postgres service. This
       # step is the CI-equivalent: create the same roles the tracked migrations assume exist
       # (bion_owner/bion_rw per migrations/0002_grants.sql; bion_desktop_ro is never created by a
-      # tracked migration — its own role creation predates that convention, directive-72 — but
+      # tracked migration — its own role creation predates that convention — but
       # 0008/0009 reference it, so it must exist here too), then bion_test + grants, then write
       # .env.test (gitignored locally, generated fresh here — never the real local secrets).
       - name: Provision bion_test roles + database
@@ -74,7 +74,7 @@ jobs:
           BION_NTFY_URL=
           BION_NTFY_TOKEN=
           EOF
-          # test/env.test.ts exercises the real production concern directive-11 exists for (the
+          # test/env.test.ts exercises a real production concern (the
           # Task-Scheduler-launched daemon must load .env.local regardless of cwd) — it loads this
           # file into an isolated object, never real process.env, so a non-functioning placeholder
           # ntfy URL is safe here: nothing in the suite makes a real network call against it.

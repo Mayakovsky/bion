@@ -6,9 +6,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { resolveEnvPath, repoRoot, repoPath } from '../src/index.js'
 
-// directive-11: .env.local must resolve module-relative (repo root), NOT process.cwd() — so the
+// .env.local must resolve module-relative (repo root), NOT process.cwd() — so the
 // Task-Scheduler-launched daemon (cwd ≠ repo) still loads BION_DATABASE_URL + BION_NTFY_URL.
-describe('env loading is cwd-independent (directive-11)', () => {
+describe('env loading is cwd-independent', () => {
   it('resolveEnvPath points at the repo-root .env.local regardless of cwd, and both vars load', () => {
     const orig = process.cwd()
     const elsewhere = mkdtempSync(join(tmpdir(), 'bion-cwd-'))

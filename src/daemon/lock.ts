@@ -2,11 +2,11 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { dirname } from 'node:path'
 import { repoPath } from '../paths.js'
 
-// Single-instance lock (directive-15) — first-wins, machine-local pidfile. A second launch NEVER
+// Single-instance lock — first-wins, machine-local pidfile. A second launch NEVER
 // kills the incumbent: it declines and exits. A stale pidfile (dead pid) is reclaimed so a crash
 // can't block every future start. This is a correctness (one heartbeat writer) + cost (no
 // double-dispatch under autonomy) guarantee. It guards ONE machine only — cross-host coordination
-// against a shared DB is a DB advisory lock, out of scope here (see FDQ-B15).
+// against a shared DB is a DB advisory lock, out of scope here (a tracked open question).
 
 export function pidfilePath(path?: string): string {
   return path ?? repoPath('.bion', 'daemon', 'daemon.pid')

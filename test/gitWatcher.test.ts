@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pollGit, createGitPollState, commitSignal, handleGitSignal, readGitHead, query, type RepoRef } from '../src/index.js'
 
-// Direct pollGit() coverage (directive-27) — pollGit previously lived unexported inside daemon.ts
+// Direct pollGit() coverage — pollGit previously lived unexported inside daemon.ts
 // and had no direct test coverage at all (daemon.test.ts always passes watchGit: false). Throwaway
 // local git repos, not real bion/grey, per the directive's own instruction.
 

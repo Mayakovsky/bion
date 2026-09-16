@@ -1,4 +1,4 @@
-import './testEnv.js' // must run before runMigrations pulls in src/env.js (directive-23 Part A)
+import './testEnv.js' // must run before runMigrations pulls in src/env.js
 import { runMigrations } from '../src/db/migrate.js'
 
 // Apply migrations once (idempotent) before the suite. Owner lane (bion_owner). Targets
