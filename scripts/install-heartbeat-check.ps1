@@ -1,12 +1,12 @@
 # install-heartbeat-check.ps1 — register BionHeartbeatCheck as an S4U scheduled task.
 #
 # Companion to install-daemon.ps1, same non-admin-task philosophy, different logon type on
-# purpose: BionDaemon's AtLogOn/Interactive trigger dies on every logoff/sleep/reboot (see
-# BION-DAEMON-LIVENESS-URGENT-CHECK-REPORT-KOV.md) -- a liveness checker sharing that exact
+# purpose: BionDaemon's AtLogOn/Interactive trigger dies on every logoff/sleep/reboot (found via
+# an internal liveness-check report) -- a liveness checker sharing that exact
 # vulnerability would go dark at precisely the moment it's needed. S4U ("run whether user is
 # logged on or not", no stored password) survives session teardown; it needs the "Log on as a
-# batch job" right, which Administrators hold by default (BION-HEARTBEATCHECK-S4U-REGISTRATION-
-# KOV-directive.md), and REQUIRES an elevated caller to register (this is the one-time elevated
+# batch job" right, which Administrators hold by default (per an internal
+# registration writeup), and REQUIRES an elevated caller to register (this is the one-time elevated
 # step Kov's sandboxed session cannot perform itself).
 #
 # Usage (elevated PowerShell ONLY -- see below):
@@ -29,7 +29,7 @@ $action = New-ScheduledTaskAction -Execute $psExe `
 $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) `
   -RepetitionInterval (New-TimeSpan -Minutes 1) -RepetitionDuration (New-TimeSpan -Days 3650)
 
-$principal = New-ScheduledTaskPrincipal -UserId 'kidco' -LogonType S4U -RunLevel Highest
+$principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType S4U -RunLevel Highest
 
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
   -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 2)
@@ -37,11 +37,11 @@ $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoi
 try {
   Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger `
     -Principal $principal -Settings $settings -Force | Out-Null
-  Write-Output "[install-heartbeat-check] registered scheduled task '$taskName' (S4U, user=kidco, every 1 min)"
+  Write-Output "[install-heartbeat-check] registered scheduled task '$taskName' (S4U, user=$env:USERNAME, every 1 min)"
   Write-Output "[install-heartbeat-check] start now with:  Start-ScheduledTask -TaskName $taskName"
   Write-Output "[install-heartbeat-check] verify with:     Get-ScheduledTask -TaskName $taskName | Select State; (Get-ScheduledTask -TaskName $taskName).Principal | Select LogonType"
 } catch {
   Write-Output "[install-heartbeat-check] HALT: registration failed even elevated: $($_.Exception.Message)"
-  Write-Output "[install-heartbeat-check] Confirm this PowerShell window is actually elevated (Administrator) and that the 'kidco' account holds 'Log on as a batch job' (secpol.msc -> Local Policies -> User Rights Assignment)."
+  Write-Output "[install-heartbeat-check] Confirm this PowerShell window is actually elevated (Administrator) and that the `"$env:USERNAME`" account holds 'Log on as a batch job' (secpol.msc -> Local Policies -> User Rights Assignment)."
   exit 1
 }

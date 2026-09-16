@@ -5,9 +5,10 @@
 // in one call (not separate check/record steps) so there's no window for two concurrent attempts
 // to both pass.
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
+import { homedir } from 'node:os';
 
-const STATE_PATH = 'C:\\Users\\kidco\\.local\\mcp\\kov-notify-state.json';
+const STATE_PATH = join(homedir(), '.local', 'mcp', 'kov-notify-state.json');
 const WINDOW_MS = 60_000;
 const CAP = 3; // sane per-minute ceiling — addendum's "cheap insurance against a flood" ask
 

@@ -5,8 +5,8 @@ import type { Executor } from '../db/pool.js'
 import { recordEvent } from '../core/events.js'
 import { estimateCost } from './pricing.js'
 
-// Kov-source cost collector (directive-18 §Section A/3): Bion's REAL cost source (recon confirmed
-// exact per-turn token counts, not an estimate — see _internal/COST-RECON-FINDINGS.md Task A).
+// Kov-source cost collector: Bion's REAL cost source (confirmed by internal investigation to give
+// exact per-turn token counts, not an estimate).
 //
 // Reads Claude Code CLI's own local session logs directly — no ccusage dependency, since all we
 // need is the same JSONL Claude Code already writes. Runs on-demand (event-driven, Q1: no timer).
@@ -100,7 +100,7 @@ export interface CollectKovCostResult {
 /**
  * Parse ~/.claude/projects/**\/*.jsonl and record one cost.kov event per distinct turn
  * (target_seat='kov', is_approximate=false — recon confirmed these are real token counts).
- * trigger_class is the Claude Code project-folder slug (e.g. `C--Users-kidco-dev-bion-repo`) —
+ * trigger_class is the Claude Code project-folder slug (e.g. `C--Users-you-dev-bion-repo`) —
  * the only "why" signal a plain session log actually gives us, not an invented category.
  */
 export async function collectKovCost(deps: { root?: string; exec?: Executor } = {}): Promise<CollectKovCostResult> {
