@@ -17,7 +17,9 @@ export function branchSignal(repo: string, branch: string, sha: string): GitSign
 
 /** Read the current HEAD (branch + sha) from a git working tree. */
 export function readGitHead(cwd: string): { branch: string; sha: string } {
-  const run = (args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
+  // execFileSync blocks the event loop (and with it the heartbeat timer), so a hung git must fail
+  // this repo's poll after a bound, not wedge the daemon. pollGit's per-repo catch absorbs the throw.
+  const run = (args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', timeout: 10_000 }).trim()
   return { branch: run(['rev-parse', '--abbrev-ref', 'HEAD']), sha: run(['rev-parse', 'HEAD']) }
 }
 

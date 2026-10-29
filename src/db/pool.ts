@@ -20,9 +20,27 @@ export interface Executor {
 // starving the next file (see test/setup.ts).
 let poolRef: pg.Pool | null = null
 
+/** Postgres/driver errors that mean "the connection went away" rather than "the query was wrong":
+ *  admin shutdown/crash-restart/cannot-connect-now (57P01-03), the 08xxx connection class, and the
+ *  socket-level codes/messages node-postgres surfaces when the server closes the stream. */
+export function isConnectionError(err: unknown): boolean {
+  const e = err as { code?: string; message?: string } | null
+  const code = e?.code ?? ''
+  if (/^(08|57P0[123])/.test(code)) return true
+  if (['ECONNREFUSED', 'ECONNRESET', 'EPIPE', 'ETIMEDOUT'].includes(code)) return true
+  return /Connection terminated|terminating connection|connection timeout|Client has encountered a connection error/i.test(e?.message ?? '')
+}
+
 export function pool(): pg.Pool {
   if (!poolRef) {
     poolRef = new Pool({ connectionString: env.databaseUrl, max: 5 })
+    // An idle pooled client whose server connection dies (Postgres stopped, restarted, or its
+    // backend terminated) emits 'error' on the POOL. With no listener Node throws it as an
+    // uncaught exception and the whole process exits — the daily daemon death. The pool already
+    // discards the dead client, so logging is all that's needed; the next query opens a new one.
+    poolRef.on('error', (err) => {
+      console.error('[db] idle pool client error (discarded; next query reconnects):', (err as { code?: string }).code ?? '', (err as Error).message)
+    })
   }
   return poolRef
 }

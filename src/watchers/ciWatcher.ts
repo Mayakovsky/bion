@@ -17,6 +17,17 @@ import type { ReactiveDeps } from '../loop/reactive.js'
 
 const execFileAsync = promisify(execFile)
 
+// Outside-call time limits. Normal calls take ~0.5-1 s (measured), so these leave an order of
+// magnitude of headroom; they exist so one hung GitHub/git call fails ONE run or repo (caught by
+// the per-run / per-repo handlers below, and kept out of handledRuns so it is retried) instead of
+// wedging the whole tick. `--log-failed` gets longer because a failed run's log can be large.
+export const ciTimeouts = { gitMs: 15_000, ghMs: 30_000, logMs: 60_000 } // mutable only so tests can shorten them
+/** Upper bound on one poll's wall time. A degraded GitHub (every call burning its full timeout)
+ *  would otherwise stretch a single tick to many minutes; past this budget the poll stops, and the
+ *  repos not yet reached are simply polled on the next tick. Keeps the longest legitimate tick well
+ *  under the checker's stuck threshold. */
+export const CI_POLL_BUDGET_MS = 150_000
+
 /** The one step name both bion's and grey's CI workflows use for the real test command — both
  *  are bare `- run: pnpm test` with no custom `name:`, so GitHub always labels the step
  *  "Run pnpm test". Matched exactly; a workflow that ever renames this step needs this updated. */
@@ -32,10 +43,16 @@ export interface CIPollState {
    *  aren't as frequent as local test runs, so polling every daemon tick (45s) would hammer the
    *  API for no real gain. */
   lastPolledAt: Map<string, number>
+  /** `<repo name>:<run id>` of every run already fully resolved (handled, or judged not
+   *  test-relevant). A completed run's outcome never changes, so re-checking it is pure waste: without
+   *  this, each 5-minute poll re-ran `gh run view` for the last 10 runs of every repo (~60s of
+   *  sequential network calls per poll), and the dedup in recordEvent only saved the DB write, not
+   *  the fetches. A run whose fetch/handle threw is NOT recorded here, so it is retried. */
+  handledRuns: Set<string>
 }
 
 export function createCIPollState(): CIPollState {
-  return { lastPolledAt: new Map() }
+  return { lastPolledAt: new Map(), handledRuns: new Set() }
 }
 
 export interface GhRun {
@@ -56,7 +73,7 @@ interface GhJob {
  *  Returns null for a non-GitHub or missing remote (nothing to poll, not an error). */
 export async function resolveGhSlug(repoPath: string): Promise<string | null> {
   try {
-    const { stdout } = await execFileAsync('git', ['-C', repoPath, 'remote', 'get-url', 'origin'])
+    const { stdout } = await execFileAsync('git', ['-C', repoPath, 'remote', 'get-url', 'origin'], { timeout: ciTimeouts.gitMs })
     const m = stdout.trim().match(/github\.com[:/]([^/]+)\/([^/.]+?)(\.git)?$/)
     return m ? `${m[1]}/${m[2]}` : null
   } catch {
@@ -74,7 +91,7 @@ export async function fetchRecentRuns(ghSlug: string): Promise<GhRun[]> {
     String(RUN_LIST_LIMIT),
     '--json',
     'databaseId,conclusion,status,headBranch',
-  ])
+  ], { timeout: ciTimeouts.ghMs })
   return JSON.parse(stdout) as GhRun[]
 }
 
@@ -82,7 +99,7 @@ export async function fetchRecentRuns(ghSlug: string): Promise<GhRun[]> {
  *  no job in this run has a step named TEST_STEP_NAME at all (e.g. grey's codegen-drift/build
  *  jobs, which legitimately never run tests; not every CI run is test-relevant). */
 export async function fetchTestStepConclusion(ghSlug: string, runId: number): Promise<string | null> {
-  const { stdout } = await execFileAsync('gh', ['run', 'view', String(runId), '--repo', ghSlug, '--json', 'jobs'])
+  const { stdout } = await execFileAsync('gh', ['run', 'view', String(runId), '--repo', ghSlug, '--json', 'jobs'], { timeout: ciTimeouts.ghMs })
   const { jobs } = JSON.parse(stdout) as { jobs: GhJob[] }
   for (const job of jobs) {
     const step = job.steps.find((s) => s.name === TEST_STEP_NAME)
@@ -115,13 +132,15 @@ export function parseVitestFailedLog(raw: string): { failed: number; total: numb
 }
 
 export async function fetchFailedLog(ghSlug: string, runId: number): Promise<string> {
-  const { stdout } = await execFileAsync('gh', ['run', 'view', String(runId), '--repo', ghSlug, '--log-failed'])
+  const { stdout } = await execFileAsync('gh', ['run', 'view', String(runId), '--repo', ghSlug, '--log-failed'], { timeout: ciTimeouts.logMs })
   return stdout
 }
 
 export interface CIPollConfig {
   /** Minimum real time between polls of the same repo. Default 5 minutes. */
   pollIntervalMs?: number
+  /** Wall-time budget for one poll (default CI_POLL_BUDGET_MS); tests use a tiny value. */
+  budgetMs?: number
   /** Injectable overrides for the real gh-CLI-backed fetchers (tests only — production always
    *  uses the real defaults). Lets pollCI's own control flow (rate-limiting, per-repo isolation,
    *  non-test-job filtering, dedup namespacing) be verified offline and deterministically,
@@ -150,7 +169,9 @@ export async function pollCI(
   const getTestStepConclusion = cfg.fetchTestStepConclusionFn ?? fetchTestStepConclusion
   const getFailedLog = cfg.fetchFailedLogFn ?? fetchFailedLog
   const now = Date.now()
+  const deadline = now + (cfg.budgetMs ?? CI_POLL_BUDGET_MS)
   for (const repo of repos) {
+    if (Date.now() > deadline) break // out of budget: unreached repos keep their old lastPolledAt, so next tick picks them up
     const last = state.lastPolledAt.get(repo.name) ?? 0
     if (now - last < intervalMs) continue
     state.lastPolledAt.set(repo.name, now)
@@ -159,11 +180,17 @@ export async function pollCI(
       if (!slug) continue // no GitHub remote — nothing to poll for this repo
       const runs = await getRecentRuns(slug)
       for (const run of runs) {
+        if (Date.now() > deadline) break // remaining runs stay unresolved and are retried next poll
         if (run.status !== 'completed') continue
         if (run.conclusion !== 'success' && run.conclusion !== 'failure') continue
+        const runKey = `${repo.name}:${run.databaseId}`
+        if (state.handledRuns.has(runKey)) continue
         try {
           const stepConclusion = await getTestStepConclusion(slug, run.databaseId)
-          if (stepConclusion !== 'success' && stepConclusion !== 'failure') continue
+          if (stepConclusion !== 'success' && stepConclusion !== 'failure') {
+            state.handledRuns.add(runKey) // no test step in this run — will never become test-relevant
+            continue
+          }
 
           const passed = stepConclusion === 'success'
           const counts = passed
@@ -181,6 +208,7 @@ export async function pollCI(
             runId: String(run.databaseId),
           }
           await handleTestSignal(signal, deps, { source: 'watcher:ci', dedupPrefix: 'ci' })
+          state.handledRuns.add(runKey)
         } catch {
           /* one bad run's job/step/log fetch shouldn't block the others */
         }
