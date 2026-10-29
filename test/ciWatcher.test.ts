@@ -264,6 +264,44 @@ describe('pollCI — control flow, offline via injected fetchers', () => {
   })
 })
 
+describe('pollCI — already-resolved runs are not re-fetched', () => {
+  it('a completed run costs one step-view fetch ever, not one per poll; a run whose fetch threw is retried', async () => {
+    const repoName = `pollci-memo-${randomUUID()}`
+    const root = join(tmpdir(), `bion-mail-${randomUUID()}`)
+    const state = createCIPollState()
+    const runs: GhRun[] = [
+      { databaseId: 701, conclusion: 'success', status: 'completed', headBranch: 'main' }, // test-relevant
+      { databaseId: 702, conclusion: 'success', status: 'completed', headBranch: 'main' }, // no test step
+      { databaseId: 703, conclusion: 'success', status: 'completed', headBranch: 'main' }, // fetch throws first time
+    ]
+    const calls: number[] = []
+    let flaky = true
+    const cfg = {
+      pollIntervalMs: 0,
+      resolveGhSlugFn: async () => 'someone/somewhere',
+      fetchRecentRunsFn: async () => runs,
+      fetchTestStepConclusionFn: async (_slug: string, id: number) => {
+        calls.push(id)
+        if (id === 703 && flaky) throw new Error('gh blip')
+        return id === 702 ? null : 'success'
+      },
+      fetchFailedLogFn: async () => '',
+    }
+    const repos = [{ name: repoName, path: '/unused' }]
+
+    await pollCI(repos, state, testDeps(root), cfg)
+    expect(calls).toEqual([701, 702, 703])
+    flaky = false
+    calls.length = 0
+    await pollCI(repos, state, testDeps(root), cfg)
+    expect(calls).toEqual([703]) // 701 and 702 resolved earlier; only the failed one is retried
+    calls.length = 0
+    await pollCI(repos, state, testDeps(root), cfg)
+    expect(calls).toEqual([])
+    expect(await eventCount('test.passed', repoName)).toBe(2)
+  })
+})
+
 describe('CI vs local dedup namespacing', () => {
   it('a CI-sourced and a local-sourced signal sharing the same repo/branch/runId string record as two distinct events', async () => {
     const repoName = `dedup-ns-${randomUUID()}`

@@ -4,7 +4,7 @@ import { drainOutbox, reconcile, notifyDurably } from '../db/outbox.js'
 import { recordEvent } from '../core/events.js'
 import { reactiveMode } from '../loop/reactive.js'
 import { autoModeSetting } from '../auto/autoMode.js'
-import { closePool } from '../db/pool.js'
+import { closePool, isConnectionError } from '../db/pool.js'
 import { pollGit, createGitPollState, type RepoRef } from '../watchers/gitWatcher.js'
 import { pollTests, createTestPollState } from '../watchers/testWatcher.js'
 import { pollCI, createCIPollState } from '../watchers/ciWatcher.js'
@@ -26,6 +26,8 @@ import { env } from '../env.js'
 
 export interface DaemonOptions {
   intervalMs?: number
+  /** How often the liveness heartbeat is rewritten, independent of tick length. Default 15s. */
+  heartbeatIntervalMs?: number
   heartbeatPath?: string
   reconcileOnStart?: boolean
   /** Poll git HEAD each tick and emit a commit signal (live watcher). Default true. */
@@ -60,6 +62,16 @@ function watchedRepos(): RepoRef[] {
   return discoverRepos(env.devRoot)
 }
 
+// Heartbeat state shared by tick() and the liveness timer. The timer proves the process is alive
+// and its event loop is turning; lastTickTs records tick progress separately, so a long tick (a CI
+// poll over a dozen repos can run a minute or more) never makes a live daemon look dead.
+let liveTick = 0
+let lastTickTs: string | undefined
+
+function currentHeartbeat(): Heartbeat {
+  return { pid: process.pid, ts: new Date().toISOString(), tick: liveTick, lastTickTs, mode: { reactive: reactiveMode(), auto: autoModeSetting() } }
+}
+
 /** One daemon iteration: drain durable intents, poll watchers, run the tick hook, heartbeat. */
 export async function tick(n: number, opts: DaemonOptions = {}): Promise<Heartbeat> {
   await drainOutbox() // pending publishes/notifies; safe no-op when the queue is empty
@@ -72,14 +84,32 @@ export async function tick(n: number, opts: DaemonOptions = {}): Promise<Heartbe
     }
   }
   if (opts.onTick) await opts.onTick(n)
-  const hb: Heartbeat = {
-    pid: process.pid,
-    ts: new Date().toISOString(),
-    tick: n,
-    mode: { reactive: reactiveMode(), auto: autoModeSetting() },
-  }
+  liveTick = n
+  lastTickTs = new Date().toISOString()
+  const hb = currentHeartbeat()
   writeHeartbeat(hb, opts.heartbeatPath ?? heartbeatPath())
   return hb
+}
+
+interface DbOutage {
+  lostAt: string
+  code: string | null
+  message: string
+}
+
+/** Events can't be written while the DB is down, so both ends of an outage are recorded once it's
+ *  back, carrying the real timestamps. Best-effort: a failure here must never take the loop down. */
+async function recordDbOutage(o: DbOutage, failedTicks: number): Promise<void> {
+  const restoredAt = new Date().toISOString()
+  const downMs = new Date(restoredAt).getTime() - new Date(o.lostAt).getTime()
+  console.log(`[daemon] DB connection restored after ~${Math.round(downMs / 1000)}s (${failedTicks} failed tick(s), first error ${o.code ?? 'n/a'})`)
+  const payload = { lostAt: o.lostAt, restoredAt, downMs, failedTicks, errorCode: o.code, errorMessage: o.message }
+  try {
+    await recordEvent({ kind: 'daemon.db.lost', source: 'daemon', payload, dedupKey: `daemon.db.lost:${process.pid}:${o.lostAt}` })
+    await recordEvent({ kind: 'daemon.db.restored', source: 'daemon', payload, dedupKey: `daemon.db.restored:${process.pid}:${restoredAt}` })
+  } catch (err) {
+    console.error('[daemon] could not record DB outage events (non-fatal):', (err as Error).message)
+  }
 }
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
@@ -99,6 +129,7 @@ export async function runDaemon(opts: DaemonOptions = {}): Promise<void> {
   if (lock.reclaimed) console.log('[daemon] reclaimed a stale pidfile')
 
   const interval = opts.intervalMs ?? 45_000
+  const hbPath = opts.heartbeatPath ?? heartbeatPath()
   let running = true
   const stop = () => {
     running = false
@@ -139,20 +170,46 @@ export async function runDaemon(opts: DaemonOptions = {}): Promise<void> {
   // On restart, recover any intents left in flight by a prior crash (production posture).
   if (opts.reconcileOnStart ?? true) await reconcile()
 
+  // Liveness timer: writes the heartbeat on its own cadence so it keeps beating through a long tick
+  // and while the DB is unreachable. Not unref'd on purpose — it dies with the loop (cleared below).
+  const hbTimer = setInterval(() => {
+    try {
+      writeHeartbeat(currentHeartbeat(), hbPath)
+    } catch (err) {
+      console.error('[daemon] heartbeat write failed (non-fatal):', (err as Error).message)
+    }
+  }, opts.heartbeatIntervalMs ?? 15_000)
+
   let n = 0
+  let dbOutage: DbOutage | null = null
+  let failures = 0
   while (running) {
     n++
+    let delay = interval
     try {
       await tick(n, opts)
+      if (dbOutage) {
+        await recordDbOutage(dbOutage, failures)
+        dbOutage = null
+      }
+      failures = 0
     } catch (err) {
+      failures++
       console.error('[daemon] tick error:', (err as Error).message)
+      if (isConnectionError(err)) {
+        dbOutage ??= { lostAt: new Date().toISOString(), code: (err as { code?: string }).code ?? null, message: (err as Error).message }
+      }
       // A tick error is often the cluster mid-crash-recovery (the service's job, not ours — see
       // cluster.ts) — just check whether it's back yet, best-effort; the next tick retries either way.
       if (opts.cluster !== false) await ensureClusterUp(opts.cluster || {}).catch(() => {})
+      // Reconnect backoff: retry at 2s, 4s, 8s, ... capped at the normal interval, instead of
+      // waiting a full interval before noticing the DB is back.
+      delay = Math.min(interval, 2000 * 2 ** Math.min(failures - 1, 10))
     }
     // sleep in short slices so SIGINT stops promptly
-    for (let waited = 0; waited < interval && running; waited += 1000) await sleep(Math.min(1000, interval))
+    for (let waited = 0; waited < delay && running; waited += 1000) await sleep(Math.min(1000, delay))
   }
+  clearInterval(hbTimer)
   await closePool()
   releaseLock(lockPath) // clean shutdown removes our pidfile (only if still ours)
 }

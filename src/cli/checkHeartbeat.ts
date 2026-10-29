@@ -8,19 +8,28 @@ import { notifyForces, type NotifyFn } from '../notify/ntfy.js'
 // `bion check-heartbeat` — a standalone liveness
 // probe, deliberately NOT part of the daemon: the whole point is to notice when the daemon
 // itself is dead, so it can't depend on the daemon (or its DB pool) to run. No DB access here —
-// just a heartbeat-file read + a direct ntfy POST, same as `isDaemonAlive`'s existing 120s
-// default (already ~2.7x the daemon's 45s tick — picked independently, kept for
-// consistency with what `bion status` already calls "down").
+// just a heartbeat-file read + a direct ntfy POST. Its threshold (below) is deliberately looser than
+// `isDaemonAlive`'s 120s default that `bion status` uses for its own "down" display.
 //
 // Edge-triggered, not level-triggered: alerts once on the healthy->stale transition, once more
 // on stale->healthy (recovery), and stays silent on every other check — a daemon down for six
 // hours produces one alert, not one every poll interval.
+//
+// Anti-flapping: the stale edge needs STALE_CONSECUTIVE_CHECKS stale readings IN A ROW before it
+// pages, and the threshold is 180s. The daemon now heartbeats on its own 15s timer, so a healthy
+// reading is ~0-20s; 180s plus two consecutive 60s checks means a real outage still pages within
+// roughly 4-5 minutes, while one late reading (a briefly blocked event loop, a half-read file) is
+// absorbed silently. A "recovered" push only ever follows a "DOWN" push, so absorbed blips produce
+// no notice at all, in either direction.
 
-const STALE_MAX_AGE_MS = 120_000
+export const STALE_MAX_AGE_MS = 180_000
+export const STALE_CONSECUTIVE_CHECKS = 2
 
 interface AlertState {
   alerted: boolean
   since?: string
+  /** Consecutive stale checks seen so far while not yet alerted. */
+  staleStreak?: number
 }
 
 function statePath(): string {
@@ -48,7 +57,7 @@ export interface CheckDeps {
   now?: number
 }
 
-export type CheckOutcome = 'alerted-stale' | 'alerted-recovered' | 'quiet-stale' | 'quiet-healthy'
+export type CheckOutcome = 'alerted-stale' | 'alerted-recovered' | 'pending-stale' | 'quiet-stale' | 'quiet-healthy'
 
 export async function checkHeartbeat(deps: CheckDeps = {}): Promise<{ outcome: CheckOutcome; ageMs: number | null }> {
   const hbPath = deps.hbPath ?? heartbeatPath()
@@ -62,6 +71,11 @@ export async function checkHeartbeat(deps: CheckDeps = {}): Promise<{ outcome: C
   const state = readState(sPath)
 
   if (!alive && !state.alerted) {
+    const streak = (state.staleStreak ?? 0) + 1
+    if (streak < STALE_CONSECUTIVE_CHECKS) {
+      writeState({ alerted: false, staleStreak: streak }, sPath)
+      return { outcome: 'pending-stale', ageMs }
+    }
     const ageStr = hb ? `${Math.round(ageMs! / 1000)}s` : 'no heartbeat file at all'
     await notify({
       title: 'Bion daemon DOWN',
@@ -86,6 +100,7 @@ export async function checkHeartbeat(deps: CheckDeps = {}): Promise<{ outcome: C
     return { outcome: 'alerted-recovered', ageMs }
   }
 
+  if (alive && state.staleStreak) writeState({ alerted: false }, sPath) // blip absorbed, streak reset
   return { outcome: alive ? 'quiet-healthy' : 'quiet-stale', ageMs }
 }
 

@@ -32,10 +32,16 @@ export interface CIPollState {
    *  aren't as frequent as local test runs, so polling every daemon tick (45s) would hammer the
    *  API for no real gain. */
   lastPolledAt: Map<string, number>
+  /** `<repo name>:<run id>` of every run already fully resolved (handled, or judged not
+   *  test-relevant). A completed run's outcome never changes, so re-checking it is pure waste: without
+   *  this, each 5-minute poll re-ran `gh run view` for the last 10 runs of every repo (~60s of
+   *  sequential network calls per poll), and the dedup in recordEvent only saved the DB write, not
+   *  the fetches. A run whose fetch/handle threw is NOT recorded here, so it is retried. */
+  handledRuns: Set<string>
 }
 
 export function createCIPollState(): CIPollState {
-  return { lastPolledAt: new Map() }
+  return { lastPolledAt: new Map(), handledRuns: new Set() }
 }
 
 export interface GhRun {
@@ -161,9 +167,14 @@ export async function pollCI(
       for (const run of runs) {
         if (run.status !== 'completed') continue
         if (run.conclusion !== 'success' && run.conclusion !== 'failure') continue
+        const runKey = `${repo.name}:${run.databaseId}`
+        if (state.handledRuns.has(runKey)) continue
         try {
           const stepConclusion = await getTestStepConclusion(slug, run.databaseId)
-          if (stepConclusion !== 'success' && stepConclusion !== 'failure') continue
+          if (stepConclusion !== 'success' && stepConclusion !== 'failure') {
+            state.handledRuns.add(runKey) // no test step in this run — will never become test-relevant
+            continue
+          }
 
           const passed = stepConclusion === 'success'
           const counts = passed
@@ -181,6 +192,7 @@ export async function pollCI(
             runId: String(run.databaseId),
           }
           await handleTestSignal(signal, deps, { source: 'watcher:ci', dedupPrefix: 'ci' })
+          state.handledRuns.add(runKey)
         } catch {
           /* one bad run's job/step/log fetch shouldn't block the others */
         }
