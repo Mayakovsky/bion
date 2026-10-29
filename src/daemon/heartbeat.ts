@@ -11,6 +11,9 @@ export interface Heartbeat {
   pid: number
   ts: string
   tick: number
+  /** When this process began its loop. Lets the checker tell "first tick still running after a
+   *  fresh start" from "ticks stopped finishing". Absent in files written by older daemons. */
+  startedAt?: string
   /** When the most recent tick finished — absent until the first tick completes. */
   lastTickTs?: string
   mode: { reactive: string; auto: string }

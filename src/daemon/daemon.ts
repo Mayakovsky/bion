@@ -67,9 +67,10 @@ function watchedRepos(): RepoRef[] {
 // poll over a dozen repos can run a minute or more) never makes a live daemon look dead.
 let liveTick = 0
 let lastTickTs: string | undefined
+let startedAtTs: string | undefined
 
 function currentHeartbeat(): Heartbeat {
-  return { pid: process.pid, ts: new Date().toISOString(), tick: liveTick, lastTickTs, mode: { reactive: reactiveMode(), auto: autoModeSetting() } }
+  return { pid: process.pid, ts: new Date().toISOString(), tick: liveTick, startedAt: startedAtTs, lastTickTs, mode: { reactive: reactiveMode(), auto: autoModeSetting() } }
 }
 
 /** One daemon iteration: drain durable intents, poll watchers, run the tick hook, heartbeat. */
@@ -150,6 +151,9 @@ export async function runDaemon(opts: DaemonOptions = {}): Promise<void> {
   }
 
   const startedAt = new Date().toISOString()
+  startedAtTs = startedAt
+  liveTick = 0
+  lastTickTs = undefined
   await recordEvent({
     kind: 'daemon.start',
     source: 'daemon',

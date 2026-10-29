@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { mkdirSync, writeFileSync } from 'node:fs'
-import { checkHeartbeat, STALE_CONSECUTIVE_CHECKS, STALE_MAX_AGE_MS } from '../src/cli/checkHeartbeat.js'
+import { checkHeartbeat, STALE_CONSECUTIVE_CHECKS, STALE_MAX_AGE_MS, STUCK_MAX_AGE_MS } from '../src/cli/checkHeartbeat.js'
 import type { NotifyInput } from '../src/notify/ntfy.js'
 
 // Heartbeat ages (seconds) as seen by the real once-a-minute checker on 2026-10-28, 17:00-20:57
@@ -82,5 +82,106 @@ describe('heartbeat alert logic against the real 2026-10-28 stall pattern', () =
   it('an outage that then recovers sends exactly one DOWN then one recovered', async () => {
     const sent = await replay([5, 400, 460, 520, 580, 9, 12])
     expect(sent.map((s) => s.title)).toEqual(['Bion daemon DOWN', 'Bion daemon recovered'])
+  })
+})
+
+// ── STUCK: process alive (heartbeat timer beating) but no tick has finished ──────────────────────
+
+interface Frame {
+  /** Seconds since the heartbeat file was last written. */
+  age: number
+  /** Seconds since the last finished tick; omit for "no tick finished yet". */
+  tickAge?: number
+  /** Seconds since the process began its loop; omit for a file from an older daemon. */
+  startedAge?: number
+  tick?: number
+}
+
+async function replayFrames(frames: Frame[]): Promise<{ sent: NotifyInput[]; outcomes: string[] }> {
+  const dir = join(tmpdir(), `bion-hbstuck-${randomUUID()}`)
+  mkdirSync(dir, { recursive: true })
+  const hbPath = join(dir, 'heartbeat.json')
+  const statePath = join(dir, 'state.json')
+  const sent: NotifyInput[] = []
+  const outcomes: string[] = []
+  const notify = async (i: NotifyInput) => (sent.push(i), { sent: true, dryRun: false })
+  let now = Date.UTC(2026, 9, 29, 0, 0, 0)
+  for (const f of frames) {
+    now += 60_000
+    const iso = (ageS: number) => new Date(now - ageS * 1000).toISOString()
+    writeFileSync(
+      hbPath,
+      JSON.stringify({
+        pid: 7,
+        ts: iso(f.age),
+        tick: f.tick ?? 5,
+        ...(f.startedAge !== undefined ? { startedAt: iso(f.startedAge) } : {}),
+        ...(f.tickAge !== undefined ? { lastTickTs: iso(f.tickAge) } : {}),
+        mode: { reactive: 'shadow', auto: 'off' },
+      }),
+    )
+    outcomes.push((await checkHeartbeat({ hbPath, statePath, notify, now })).outcome)
+  }
+  return { sent, outcomes }
+}
+
+const OK = { age: 4, tickAge: 30, startedAge: 3600 }
+
+describe('STUCK alert: process alive, ticks stopped finishing', () => {
+  it('fresh heartbeat but stale lastTickTs -> one STUCK after the consecutive checks, then silent', async () => {
+    const stuck = { age: 4, tickAge: STUCK_MAX_AGE_MS / 1000 + 120, startedAge: 7200 }
+    const { sent, outcomes } = await replayFrames([OK, stuck, stuck, stuck, stuck])
+    expect(outcomes).toEqual(['quiet-healthy', 'pending-stuck', 'alerted-stuck', 'quiet-stuck', 'quiet-stuck'])
+    expect(sent).toHaveLength(1)
+    expect(sent[0]!.title).toBe('Bion daemon STUCK')
+    expect(sent[0]!.title).not.toMatch(/DOWN/) // distinguishable from the DOWN alert
+    expect(sent[0]!.message).toMatch(/alive/)
+    expect(sent[0]!.message).toMatch(/no tick has finished in \d+ min/)
+    expect(sent[0]!.message).toMatch(/#5 at \d{4}-/) // last tick number + lastTickTs
+  })
+
+  it('a single late tick reading is absorbed (consecutive-check rule), no push either way', async () => {
+    const late = { age: 4, tickAge: STUCK_MAX_AGE_MS / 1000 + 30, startedAge: 7200 }
+    const { sent } = await replayFrames([OK, late, OK, OK])
+    expect(sent).toHaveLength(0)
+  })
+
+  it('ticks resuming after STUCK sends exactly one recovered push', async () => {
+    const stuck = { age: 4, tickAge: 900, startedAge: 7200 }
+    const { sent, outcomes } = await replayFrames([OK, stuck, stuck, stuck, OK, OK])
+    expect(sent.map((s) => s.title)).toEqual(['Bion daemon STUCK', 'Bion daemon ticks resumed'])
+    expect(outcomes.slice(-2)).toEqual(['alerted-stuck-recovered', 'quiet-healthy'])
+  })
+
+  it('a fresh start with no lastTickTs yet is silent while inside the threshold, even on a long first tick', async () => {
+    const first = { age: 4, startedAge: 120 } // the ~62 s first CI poll, with margin
+    const { sent } = await replayFrames([first, { ...first, startedAge: 180 }, { ...first, startedAge: 400 }, { ...first, startedAge: 560 }])
+    expect(sent).toHaveLength(0)
+  })
+
+  it('a start that never finishes a first tick does page once the threshold has passed since process start', async () => {
+    const wedged = (startedAge: number) => ({ age: 4, startedAge })
+    const { sent } = await replayFrames([wedged(300), wedged(660), wedged(720), wedged(780)])
+    expect(sent.map((s) => s.title)).toEqual(['Bion daemon STUCK'])
+    expect(sent[0]!.message).toMatch(/none since start/)
+  })
+
+  it('a heartbeat file from an older daemon (no startedAt, no lastTickTs) is never judged stuck', async () => {
+    const { sent } = await replayFrames([{ age: 4 }, { age: 4 }, { age: 4 }])
+    expect(sent).toHaveLength(0)
+  })
+
+  it('dead process with stale ticks -> DOWN only, never DOWN and STUCK together', async () => {
+    const dead = { age: 400, tickAge: 5000, startedAge: 9000 }
+    const { sent } = await replayFrames([OK, dead, dead, dead, dead])
+    expect(sent.map((s) => s.title)).toEqual(['Bion daemon DOWN'])
+  })
+
+  it('STUCK that turns into a dead process -> DOWN, then one recovered, and no spurious "ticks resumed"', async () => {
+    const stuck = { age: 4, tickAge: 900, startedAge: 7200 }
+    const dead = { age: 400, tickAge: 1300, startedAge: 7600 }
+    const restarted = { age: 4, tickAge: 20, startedAge: 60 }
+    const { sent } = await replayFrames([OK, stuck, stuck, dead, dead, restarted, restarted])
+    expect(sent.map((s) => s.title)).toEqual(['Bion daemon STUCK', 'Bion daemon DOWN', 'Bion daemon recovered'])
   })
 })

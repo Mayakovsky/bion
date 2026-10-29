@@ -1,12 +1,15 @@
 import { describe, it, expect } from 'vitest'
 import { randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { mkdirSync } from 'node:fs'
+import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   pollCI,
   createCIPollState,
+  fetchRecentRuns,
+  fetchTestStepConclusion,
+  ciTimeouts,
   resolveGhSlug,
   parseVitestFailedLog,
   KovAdapter,
@@ -299,6 +302,104 @@ describe('pollCI — already-resolved runs are not re-fetched', () => {
     await pollCI(repos, state, testDeps(root), cfg)
     expect(calls).toEqual([])
     expect(await eventCount('test.passed', repoName)).toBe(2)
+  })
+})
+
+/** A REAL `gh` that never returns: node.exe copied to <dir>/gh.exe with a --require hook that blocks
+ *  the event loop forever before any script runs, so execFile's own timeout is what ends the call. */
+function hangingGhDir(): string {
+  const dir = join(tmpdir(), `bion-hanggh-${randomUUID()}`)
+  mkdirSync(dir, { recursive: true })
+  copyFileSync(process.execPath, join(dir, 'gh.exe'))
+  writeFileSync(join(dir, 'hang.cjs'), 'Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0)')
+  return dir
+}
+
+describe('pollCI — outside-call timeouts (real hung gh)', () => {
+  it('a hung gh fails one run/repo inside the timeout, stays out of handledRuns, and is retried next poll', async () => {
+    const dir = hangingGhDir()
+    const savedPath = process.env.PATH
+    const savedOpts = process.env.NODE_OPTIONS
+    const savedTimeouts = { ...ciTimeouts }
+    ciTimeouts.ghMs = 800
+    const repoName = `pollci-hang-${randomUUID()}`
+    const root = join(tmpdir(), `bion-mail-${randomUUID()}`)
+    const state = createCIPollState()
+    const runs: GhRun[] = [{ databaseId: 801, conclusion: 'success', status: 'completed', headBranch: 'main' }]
+    const repos = [{ name: repoName, path: '/unused' }]
+    try {
+      // Poll 1: the real fetchTestStepConclusion shells out to the hung gh.
+      process.env.PATH = `${dir};${savedPath}`
+      process.env.NODE_OPTIONS = `--require ${join(dir, 'hang.cjs').split('\\').join('/')}`
+      const t0 = Date.now()
+      await pollCI(repos, state, testDeps(root), {
+        pollIntervalMs: 0,
+        resolveGhSlugFn: async () => 'someone/somewhere',
+        fetchRecentRunsFn: async () => runs,
+        fetchTestStepConclusionFn: fetchTestStepConclusion, // real, hangs
+        fetchFailedLogFn: async () => '',
+      })
+      expect(Date.now() - t0).toBeGreaterThanOrEqual(700) // gh really hung until execFile's timeout killed it
+      expect(Date.now() - t0).toBeLessThan(8_000) // ...and the poll still finished
+      expect(state.lastPolledAt.has(repoName)).toBe(true)
+      expect(state.handledRuns.has(`${repoName}:801`)).toBe(false)
+      expect(await eventCount('test.passed', repoName)).toBe(0)
+
+      // The list call itself hung: also contained, poll still returns.
+      const t1 = Date.now()
+      await pollCI(repos, createCIPollState(), testDeps(root), {
+        pollIntervalMs: 0,
+        resolveGhSlugFn: async () => 'someone/somewhere',
+        fetchRecentRunsFn: fetchRecentRuns, // real, hangs
+        fetchTestStepConclusionFn: async () => 'success',
+        fetchFailedLogFn: async () => '',
+      })
+      expect(Date.now() - t1).toBeGreaterThanOrEqual(700)
+      expect(Date.now() - t1).toBeLessThan(8_000)
+
+      // Poll 2: gh healthy again -> the same run is retried and handled.
+      process.env.PATH = savedPath
+      if (savedOpts === undefined) delete process.env.NODE_OPTIONS
+      else process.env.NODE_OPTIONS = savedOpts
+      await pollCI(repos, state, testDeps(root), {
+        pollIntervalMs: 0,
+        resolveGhSlugFn: async () => 'someone/somewhere',
+        fetchRecentRunsFn: async () => runs,
+        fetchTestStepConclusionFn: async () => 'success',
+        fetchFailedLogFn: async () => '',
+      })
+      expect(await eventCount('test.passed', repoName)).toBe(1)
+      expect(state.handledRuns.has(`${repoName}:801`)).toBe(true)
+    } finally {
+      process.env.PATH = savedPath
+      if (savedOpts === undefined) delete process.env.NODE_OPTIONS
+      else process.env.NODE_OPTIONS = savedOpts
+      Object.assign(ciTimeouts, savedTimeouts)
+    }
+  }, 40_000)
+
+  it('stops polling once the poll budget is spent; unreached repos are picked up on the next poll', async () => {
+    const root = join(tmpdir(), `bion-mail-${randomUUID()}`)
+    const state = createCIPollState()
+    const repos = [1, 2, 3].map((i) => ({ name: `pollci-budget-${i}-${randomUUID()}`, path: '/unused' }))
+    const seen: string[] = []
+    const cfg = {
+      pollIntervalMs: 60_000,
+      budgetMs: 50,
+      resolveGhSlugFn: async (path: string) => (seen.push(path), 'someone/somewhere'),
+      fetchRecentRunsFn: async () => {
+        await new Promise((r) => setTimeout(r, 80)) // each repo burns more than the whole budget
+        return [] as GhRun[]
+      },
+      fetchTestStepConclusionFn: async () => 'success',
+      fetchFailedLogFn: async () => '',
+    }
+    await pollCI(repos, state, testDeps(root), cfg)
+    expect(seen).toHaveLength(1) // repo 1 started inside the budget and spent it; the loop stopped before repo 2
+    expect(state.lastPolledAt.has(repos[1]!.name)).toBe(false) // untouched, so the next tick polls it
+    seen.length = 0
+    await pollCI(repos, state, testDeps(root), cfg)
+    expect(state.lastPolledAt.has(repos[1]!.name)).toBe(true) // repo 1 is inside its interval and skipped; repo 2 gets its turn
   })
 })
 
