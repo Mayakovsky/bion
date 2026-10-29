@@ -36,10 +36,13 @@ async function replay(agesS: number[]): Promise<NotifyInput[]> {
   for (const age of agesS) {
     now += 60_000
     writeFileSync(hbPath, JSON.stringify({ pid: 1, ts: new Date(now - age * 1000).toISOString(), tick: 1, mode: { reactive: 'shadow', auto: 'off' } }))
-    await checkHeartbeat({ hbPath, statePath, notify, now })
+    await checkHeartbeat({ hbPath, statePath, notify, now, session: noSession })
   }
   return sent
 }
+
+/** Probe that fails, i.e. no boot/logon knowledge: the plain threshold rules apply (also what these tests assume). */
+const noSession = async () => null
 
 const titles = (sent: NotifyInput[], t: string) => sent.filter((s) => s.title === t).length
 
@@ -120,7 +123,7 @@ async function replayFrames(frames: Frame[]): Promise<{ sent: NotifyInput[]; out
         mode: { reactive: 'shadow', auto: 'off' },
       }),
     )
-    outcomes.push((await checkHeartbeat({ hbPath, statePath, notify, now })).outcome)
+    outcomes.push((await checkHeartbeat({ hbPath, statePath, notify, now, session: noSession })).outcome)
   }
   return { sent, outcomes }
 }
